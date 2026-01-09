@@ -1,0 +1,90 @@
+# ==================================
+# MGP AI Assistant - .gitignore
+# ==================================
+
+# ===== Секреты и конфигурация =====
+.env
+.env.local
+.env.*.local
+*.env
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ===== Виртуальное окружение =====
+.venv/
+venv/
+ENV/
+env/
+.env/
+
+# ===== IDE и редакторы =====
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# ===== macOS =====
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ===== Windows =====
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ===== Linux =====
+*~
+
+# ===== Логи и временные файлы =====
+*.log
+*.tmp
+*.temp
+logs/
+tmp/
+
+# ===== Данные приложения =====
+leads.txt
+*.db
+*.sqlite3
+
+# ===== Jupyter Notebooks =====
+.ipynb_checkpoints/
+
+# ===== pytest =====
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ===== mypy =====
+.mypy_cache/
+
+# ===== Cursor IDE =====
+.cursor/
