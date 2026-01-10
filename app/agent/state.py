@@ -89,6 +89,8 @@ class AgentState(TypedDict):
     offered_alt_departure: bool
     # КРИТИЧНО: количество детей, для которых нужен возраст
     missing_child_ages: int
+    # Контекст последнего вопроса (для интерпретации коротких ответов типа "5")
+    last_question_type: Optional[str]  # "nights", "adults", "stars", "dates", etc.
 
 
 # ==================== КАСКАД ВОПРОСОВ ====================
@@ -167,13 +169,15 @@ def get_cascade_stage(params: PartialSearchParams) -> int:
     """
     Определяет текущий этап каскада.
     
-    СТРОГИЙ ПОРЯДОК:
+    СТРОГИЙ ПОРЯДОК (согласно ТЗ):
     1 — нужна страна
     2 — нужен город вылета (ОБЯЗАТЕЛЬНО!)
     3 — нужны даты
-    4 — нужен состав
-    5 — нужны детали (звёзды/питание)
+    4 — нужен состав (adults) И длительность (nights)
+    5 — нужны детали (звёзды/питание) — для массовых направлений
     6 — всё собрано, можно искать
+    
+    КРИТИЧНО: Не запускаем поиск без adults и nights!
     """
     # Этап 1: нет страны
     if not params.get("destination_country"):
@@ -187,8 +191,14 @@ def get_cascade_stage(params: PartialSearchParams) -> int:
     if not params.get("date_from"):
         return 3
     
-    # Этап 4: нет состава
-    if not params.get("adults"):
+    # Этап 4: нет состава ИЛИ длительности
+    # КРИТИЧНО: adults должен быть ЯВНО указан пользователем, не дефолт!
+    adults_explicit = params.get("adults_explicit", False)  # Флаг явного указания
+    adults = params.get("adults")
+    nights = params.get("nights")
+    
+    # Если adults не указан явно ИЛИ nights не указан — спрашиваем
+    if not adults or not adults_explicit or not nights:
         return 4
     
     # Этап 5: для массовых направлений нужны детали
@@ -290,9 +300,17 @@ def format_context(params: PartialSearchParams) -> str:
             parts.append(f"{d.strftime('%d.%m')}, {nights} ночей")
     if params.get("adults"):
         adults = params["adults"]
-        if params.get("children"):
-            kids = params["children"]
-            parts.append(f"{adults} взр + {len(kids)} дет")
+        children = params.get("children", [])
+        
+        if children:
+            # КРИТИЧНО: Показываем и количество, и возраст детей!
+            # Формат: "2 взр + 1 дет (7 лет)" или "2 взр + 2 дет (5 и 10 лет)"
+            if len(children) == 1:
+                kids_text = f"1 дет ({children[0]} лет)"
+            else:
+                ages_text = ", ".join(str(age) for age in children)
+                kids_text = f"{len(children)} дет ({ages_text} лет)"
+            parts.append(f"{adults} взр + {kids_text}")
         else:
             parts.append(f"{adults} взр")
     if params.get("stars"):
@@ -330,5 +348,6 @@ def create_initial_state() -> AgentState:
         pending_action=None,
         search_attempts=0,
         offered_alt_departure=False,
-        missing_child_ages=0
+        missing_child_ages=0,
+        last_question_type=None  # Контекст для интерпретации "5" → nights/adults
     )

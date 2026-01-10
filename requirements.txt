@@ -22,3 +22,9 @@ python-dotenv>=1.0.0
 
 # Async Support
 anyio>=4.2.0
+
+# Scheduler (Auto-Sync справочников Tourvisor)
+apscheduler>=3.10.0
+
+# Fuzzy String Matching (для городов вылета)
+thefuzz>=0.22.0

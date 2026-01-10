@@ -32,6 +32,25 @@ from app.models.domain import (
     Destination,
 )
 
+# Fuzzy Matching для городов вылета
+try:
+    from thefuzz import fuzz, process
+    FUZZY_ENABLED = True
+except ImportError:
+    FUZZY_ENABLED = False
+    logger = logging.getLogger(__name__)
+    logger.warning("⚠️ thefuzz не установлен. Fuzzy matching отключен.")
+
+# Импорт авто-сгенерированных констант (синхронизируются из Tourvisor API)
+try:
+    from app.core.tourvisor_constants import COUNTRIES, DEPARTURES
+    CONSTANTS_LOADED = True
+except ImportError:
+    # Fallback если файл констант ещё не создан
+    COUNTRIES = {}
+    DEPARTURES = {}
+    CONSTANTS_LOADED = False
+
 # Настройка логгера
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -286,32 +305,44 @@ class TourvisorService:
             return False
     
     def _load_mock_countries(self):
-        """Fallback данные для mock режима."""
-        mock_countries = [
-            (4, "Турция", "Turkey"),
-            (5, "Египет", "Egypt"),
-            (95, "ОАЭ", "UAE"),
-            (2, "Таиланд", "Thailand"),
-            (8, "Мальдивы", "Maldives"),
-            (7, "Кипр", "Cyprus"),
-            (3, "Греция", "Greece"),
-            (6, "Испания", "Spain"),
-            (17, "Индонезия", "Indonesia"),
-            (13, "Вьетнам", "Vietnam"),
-            (62, "Шри-Ланка", "Sri Lanka"),
-            (22, "Доминикана", "Dominican Republic"),
-            (28, "Черногория", "Montenegro"),
-            (35, "Россия", "Russia"),
-        ]
+        """
+        Fallback данные из авто-сгенерированного файла констант.
         
-        for cid, name, name_en in mock_countries:
-            info = CountryInfo(country_id=cid, name=name, name_en=name_en)
-            self._countries_cache[name.lower()] = info
-            self._countries_cache[name_en.lower()] = info
-            self._countries_by_id[cid] = info
-        
-        self._countries_loaded = True
-        logger.info(f"🌍 [MOCK] Загружено {len(self._countries_by_id)} стран")
+        Константы загружаются из app/core/tourvisor_constants.py,
+        который создаётся скриптом scripts/sync_tourvisor_data.py
+        """
+        if CONSTANTS_LOADED and COUNTRIES:
+            # Используем авто-сгенерированные константы
+            seen_ids = set()
+            for name, cid in COUNTRIES.items():
+                # Добавляем в кэш
+                if cid not in seen_ids:
+                    # Определяем отображаемое имя (первое русское)
+                    display_name = name.title()
+                    info = CountryInfo(country_id=cid, name=display_name, name_en="")
+                    self._countries_by_id[cid] = info
+                    seen_ids.add(cid)
+                
+                # Добавляем маппинг имени
+                if cid in self._countries_by_id:
+                    self._countries_cache[name.lower()] = self._countries_by_id[cid]
+            
+            self._countries_loaded = True
+            logger.info(f"🌍 [CONSTANTS] Загружено {len(self._countries_by_id)} стран из tourvisor_constants.py")
+        else:
+            # Минимальный fallback если константы не загружены
+            logger.warning("⚠️ tourvisor_constants.py не найден! Запустите: python scripts/sync_tourvisor_data.py")
+            
+            minimal_countries = [
+                (1, "Египет"), (2, "Таиланд"), (4, "Турция"), (8, "Мальдивы"), (9, "ОАЭ")
+            ]
+            for cid, name in minimal_countries:
+                info = CountryInfo(country_id=cid, name=name, name_en="")
+                self._countries_cache[name.lower()] = info
+                self._countries_by_id[cid] = info
+            
+            self._countries_loaded = True
+            logger.info(f"🌍 [FALLBACK] Загружено {len(self._countries_by_id)} стран (минимум)")
     
     async def load_departures(self) -> bool:
         """
@@ -365,18 +396,33 @@ class TourvisorService:
             return False
     
     def _get_default_departures(self) -> dict[str, int]:
-        """Дефолтные города вылета."""
+        """
+        Города вылета из авто-сгенерированного файла констант.
+        
+        Константы загружаются из app/core/tourvisor_constants.py,
+        который создаётся скриптом scripts/sync_tourvisor_data.py
+        """
+        if CONSTANTS_LOADED and DEPARTURES:
+            logger.info(f"✈️ [CONSTANTS] Используем {len(DEPARTURES)} городов из tourvisor_constants.py")
+            return DEPARTURES.copy()
+        
+        # Минимальный fallback если константы не загружены
+        logger.warning("⚠️ tourvisor_constants.py не найден! Запустите: python scripts/sync_tourvisor_data.py")
         return {
-            "москва": 1, "moscow": 1,
-            "санкт-петербург": 2, "спб": 2, "питер": 2,
-            "казань": 10,
-            "екатеринбург": 5,
-            "новосибирск": 8,
-            "краснодар": 12,
-            "ростов-на-дону": 14, "ростов": 14,
-            "уфа": 16,
-            "самара": 7,
-            "нижний новгород": 6,
+            # Москва
+            "москва": 1, "мск": 1, "москвы": 1,
+            # Санкт-Петербург
+            "санкт-петербург": 2, "спб": 2, "питер": 2, "петербург": 2,
+            # Екатеринбург
+            "екатеринбург": 3, "екб": 3,
+            # Новосибирск
+            "новосибирск": 8, "новосиб": 8,
+            # Казань
+            "казань": 10, "казани": 10,
+            # Сочи
+            "сочи": 62, "сочи (адлер)": 62, "адлер": 62,
+            # Краснодар
+            "краснодар": 11,
         }
     
     async def load_hotels_for_country(self, country_id: int) -> list[HotelInfo]:
@@ -475,22 +521,139 @@ class TourvisorService:
         return None
     
     def get_departure_id(self, name: str) -> Optional[int]:
-        """Получение ID города вылета."""
+        """
+        Получение ID города вылета с Fuzzy Matching.
+        
+        Поддерживает:
+        - Точное совпадение: "москва" → 1
+        - Частичное: "сочи" → "сочи (адлер)" → ID
+        - Fuzzy (>80%): "Питер" → "Санкт-Петербург", "Екб" → "Екатеринбург"
+        """
         if not name:
             return None
         
         name_lower = name.lower().strip()
         
+        # 1. Точное совпадение
         if name_lower in self._departures_cache:
+            logger.info(f"   ✈️ Город '{name}' → точное совпадение")
             return self._departures_cache[name_lower]
         
+        # 2. Частичное совпадение (substring)
         for key, did in self._departures_cache.items():
             if name_lower in key or key in name_lower:
+                logger.info(f"   ✈️ Город '{name}' → частичное: '{key}'")
                 return did
+        
+        # 3. Fuzzy Matching (если thefuzz установлен)
+        if FUZZY_ENABLED and self._departures_cache:
+            result = self._fuzzy_find_city(name_lower, self._departures_cache)
+            if result:
+                found_name, found_id, score = result
+                logger.info(f"   ✈️ Город '{name}' → fuzzy ({score}%): '{found_name}'")
+                return found_id
+        
+        logger.warning(f"   ⚠️ Город '{name}' не найден в справочнике")
+        return None
+    
+    def _fuzzy_find_city(
+        self, 
+        user_input: str, 
+        city_dict: dict[str, int],
+        threshold: int = 80
+    ) -> Optional[tuple[str, int, int]]:
+        """
+        Fuzzy поиск города в справочнике.
+        
+        Args:
+            user_input: Ввод пользователя (lowercase)
+            city_dict: Словарь {город: id}
+            threshold: Минимальный % совпадения (default 80%)
+        
+        Returns:
+            tuple(найденный_ключ, id, score) или None
+        """
+        if not FUZZY_ENABLED or not city_dict:
+            return None
+        
+        # Извлекаем все ключи
+        choices = list(city_dict.keys())
+        
+        # Ищем лучшее совпадение
+        result = process.extractOne(user_input, choices, scorer=fuzz.ratio)
+        
+        if result:
+            best_match, score = result[0], result[1]
+            if score >= threshold:
+                return (best_match, city_dict[best_match], score)
+        
+        # Пробуем partial_ratio для случаев типа "сочи" → "сочи (адлер)"
+        result_partial = process.extractOne(user_input, choices, scorer=fuzz.partial_ratio)
+        
+        if result_partial:
+            best_match, score = result_partial[0], result_partial[1]
+            if score >= 90:  # Более строгий порог для partial
+                return (best_match, city_dict[best_match], score)
         
         return None
     
     # ==================== 2. ПОИСК ОТЕЛЕЙ ====================
+    
+    # ==================== ТРАНСЛИТЕРАЦИЯ РУС → ENG ====================
+    # Для поиска отелей "Риксос" → "Rixos"
+    TRANSLIT_MAP = {
+        "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e",
+        "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
+        "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+        "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "sch",
+        "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+    }
+    
+    # Известные маппинги отелей (Русский → Английский)
+    HOTEL_NAME_ALIASES = {
+        "риксос": "rixos", "рикос": "rixos",
+        "калиста": "calista", "калист": "calista",
+        "регнум": "regnum", 
+        "титаник": "titanic",
+        "дельфин": "delphin", "делфин": "delphin",
+        "барут": "barut",
+        "вояж": "voyage", "войаж": "voyage",
+        "глория": "gloria",
+        "хилтон": "hilton",
+        "шератон": "sheraton",
+        "мариотт": "marriott", "марриотт": "marriott",
+        "атлантис": "atlantis",
+        "джумейра": "jumeirah", "джумейр": "jumeirah",
+        "санрайз": "sunrise",
+        "штайгенбергер": "steigenberger",
+    }
+    
+    def _transliterate(self, text: str) -> str:
+        """Транслитерация русского текста в латиницу."""
+        result = []
+        for char in text.lower():
+            result.append(self.TRANSLIT_MAP.get(char, char))
+        return "".join(result)
+    
+    def _normalize_hotel_query(self, query: str) -> list[str]:
+        """
+        Нормализация запроса для поиска отеля.
+        Возвращает список вариантов поиска.
+        """
+        query_lower = query.lower().strip()
+        variants = [query_lower]
+        
+        # Проверяем известные алиасы
+        for rus, eng in self.HOTEL_NAME_ALIASES.items():
+            if rus in query_lower:
+                variants.append(query_lower.replace(rus, eng))
+        
+        # Транслитерация если есть кириллица
+        if any(ord(c) > 127 for c in query_lower):
+            transliterated = self._transliterate(query_lower)
+            variants.append(transliterated)
+        
+        return list(set(variants))  # Убираем дубли
     
     async def find_hotel_by_name(
         self,
@@ -499,10 +662,12 @@ class TourvisorService:
         country_id: Optional[int] = None
     ) -> list[HotelInfo]:
         """
-        Поиск отелей по названию.
+        Поиск отелей по названию с поддержкой транслитерации.
         
-        Согласно документации: сначала определяем страну,
-        затем загружаем справочник отелей и фильтруем.
+        Поддерживает:
+        - Русские названия: "Риксос" → "Rixos"
+        - Частичное совпадение: "rixos" → "Rixos Premium Belek"
+        - Нечувствительность к регистру
         """
         logger.info(f"\n🔍 Поиск отеля: '{query}'")
         
@@ -519,27 +684,43 @@ class TourvisorService:
             search_country_ids = [cid] if cid else []
         else:
             # Популярные направления для поиска
-            search_country_ids = [4, 5, 95, 2, 8]  # Турция, Египет, ОАЭ, Таиланд, Мальдивы
+            # Популярные направления (ID из tourvisor_constants.py)
+            search_country_ids = [
+                COUNTRIES.get("турция", 4),
+                COUNTRIES.get("египет", 1), 
+                COUNTRIES.get("оаэ", 9),
+                COUNTRIES.get("таиланд", 2),
+                COUNTRIES.get("мальдивы", 8)
+            ]
         
         if not search_country_ids:
             logger.warning("   ⚠️ Страна не определена")
             return []
         
-        query_lower = query.lower()
+        # Получаем все варианты поиска (с транслитерацией)
+        search_variants = self._normalize_hotel_query(query)
+        logger.info(f"   🔤 Варианты поиска: {search_variants}")
+        
         results = []
         
         for cid in search_country_ids:
             hotels = await self.load_hotels_for_country(cid)
             
             for hotel in hotels:
-                if query_lower in hotel.name.lower():
-                    results.append(hotel)
-                    logger.info(f"   ✅ Найден: {hotel.name} ({hotel.stars}*)")
+                hotel_name_lower = hotel.name.lower()
+                
+                # Проверяем все варианты запроса
+                for variant in search_variants:
+                    if variant in hotel_name_lower:
+                        if hotel not in results:  # Избегаем дублей
+                            results.append(hotel)
+                            logger.info(f"   ✅ Найден: {hotel.name} ({hotel.stars}*)")
+                        break
         
         if results:
             logger.info(f"   📊 Всего найдено: {len(results)} отелей")
         else:
-            logger.warning(f"   ⚠️ Отели не найдены")
+            logger.warning(f"   ⚠️ Отели не найдены для запроса: {search_variants}")
         
         return results
     
@@ -550,7 +731,8 @@ class TourvisorService:
         params: SearchRequest,
         filters: Optional[TourFilters] = None,
         is_strict_hotel_search: bool = False,
-        hotel_ids: Optional[list[int]] = None
+        hotel_ids: Optional[list[int]] = None,
+        is_hot_tour: bool = False
     ) -> SearchResponse:
         """
         Асинхронный поиск туров через search.php.
@@ -588,8 +770,19 @@ class TourvisorService:
                 suggestion="check_country_name"
             )
         
-        # Получаем ID города вылета
-        departure_id = self.get_departure_id(params.departure_city) or 1
+        # ==================== ГОРОД ВЫЛЕТА (NO DEFAULT!) ====================
+        departure_id = self.get_departure_id(params.departure_city)
+        
+        if not departure_id:
+            logger.error(f"❌ Город вылета '{params.departure_city}' НЕ НАЙДЕН в справочнике!")
+            # НЕ используем дефолт Москва — возвращаем ошибку
+            return SearchResponse(
+                offers=[], total_found=0, found=False,
+                reason="unknown_departure",
+                suggestion=f"Город вылета '{params.departure_city}' не найден"
+            )
+        
+        logger.info(f"   ✈️ Город вылета: '{params.departure_city}' → ID={departure_id}")
         
         # Если указан отель — ищем его ID
         if params.hotel_name and not hotel_ids:
@@ -607,7 +800,8 @@ class TourvisorService:
         
         # === STEP 1: Инициируем поиск ===
         api_params = self._build_search_params(
-            params, country_id, departure_id, hotel_ids
+            params, country_id, departure_id, hotel_ids,
+            is_hot_tour=is_hot_tour
         )
         
         logger.info(f"   📡 Инициация поиска...")
@@ -633,15 +827,23 @@ class TourvisorService:
                 request_id, country_id, is_strict_hotel_search, hotel_ids
             )
             
-            # Применяем фильтры
+            # ==================== СТРОГИЕ ФИЛЬТРЫ (NO SILENT FALLBACK) ====================
+            # Применяем фильтры ЧЕСТНО — если нет туров с указанными критериями,
+            # возвращаем ПУСТОЙ СПИСОК, а не подменяем результаты!
+            
             if filters:
                 offers = self._apply_filters(offers, filters)
             
             if params.stars:
                 offers = [o for o in offers if o.hotel_stars == params.stars]
+                logger.info(f"   🏨 Фильтр {params.stars}*: осталось {len(offers)} туров")
             
             if params.food_type:
                 offers = [o for o in offers if o.food_type == params.food_type]
+                logger.info(f"   🍽️ Фильтр {params.food_type.value}: осталось {len(offers)} туров")
+            
+            # НЕТ FALLBACK! Если туров нет — возвращаем пустой список честно.
+            # Агент (nodes.py) сам решит, что предложить клиенту.
             
             # Сортируем и лимитируем
             offers = sorted(offers, key=lambda x: x.price)[:5]
@@ -655,11 +857,15 @@ class TourvisorService:
                     found=True
                 )
             else:
-                logger.warning("   ⚠️ Туры не найдены")
+                # ЧЕСТНЫЙ ОТВЕТ: туров с указанными фильтрами нет
+                logger.warning(f"   ⚠️ Туры не найдены (stars={params.stars}, food={params.food_type})")
                 return SearchResponse(
-                    offers=[], total_found=0, search_id=request_id,
-                    found=False, reason="no_tours_found",
-                    suggestion="try_changing_dates"
+                    offers=[], 
+                    total_found=0, 
+                    search_id=request_id,
+                    found=False, 
+                    reason="no_tours_with_filters",
+                    suggestion=f"На {params.stars}* туров нет" if params.stars else "Туры не найдены"
                 )
                 
         except SearchTimeoutError:
@@ -680,7 +886,10 @@ class TourvisorService:
         params: SearchRequest,
         country_id: int,
         departure_id: int,
-        hotel_ids: Optional[list[int]]
+        hotel_ids: Optional[list[int]],
+        expand_dates: bool = True,
+        expand_nights: bool = True,
+        is_hot_tour: bool = False
     ) -> dict:
         """
         Формирование параметров для search.php.
@@ -690,15 +899,41 @@ class TourvisorService:
         - child: количество детей
         - childage1, childage2...: возрасты детей (НЕ массив!)
         - hotels: список ID через запятую
+        
+        КРИТИЧНО: Расширяем диапазон поиска для увеличения шансов найти туры!
+        - Даты вылета: date_from до date_from + 2 дня (или +7 для горящих)
+        - Ночи: nights до nights + 2 (если expand_nights=True)
         """
-        nights_from = params.nights or 7
-        nights_to = (params.nights + 3) if params.nights else 14
+        # ==================== NO DEFAULTS: nights должен быть указан! ====================
+        if not params.nights:
+            logger.error("❌ КРИТИЧЕСКАЯ ОШИБКА: nights не указан!")
+            # Используем разумный fallback только для логирования, но это не должно происходить
+            nights_from = 7
+        else:
+            nights_from = params.nights
+        
+        # Расширенный диапазон ночей: +2 ночи для гибкости
+        nights_to = (nights_from + 2) if expand_nights else nights_from
+        
+        # ==================== РАСШИРЕННОЕ ОКНО ДЛЯ ГОРЯЩИХ ====================
+        # Если горящий тур или дата очень близкая (< 3 дней) — расширяем до +7 дней
+        date_start = params.date_from
+        days_until_departure = (params.date_from - date.today()).days if params.date_from else 30
+        
+        if is_hot_tour or days_until_departure < 3:
+            # Горящие туры: +7 дней (чартеры летают редко!)
+            date_end = params.date_from + timedelta(days=7)
+            logger.info(f"   🔥 Горящий тур: расширяем окно дат до +7 дней")
+        elif expand_dates:
+            date_end = params.date_from + timedelta(days=2)
+        else:
+            date_end = params.date_to or params.date_from
         
         api_params = {
             "departure": departure_id,
             "country": country_id,
-            "datefrom": params.date_from.strftime("%d.%m.%Y"),
-            "dateto": (params.date_to or params.date_from + timedelta(days=14)).strftime("%d.%m.%Y"),
+            "datefrom": date_start.strftime("%d.%m.%Y"),
+            "dateto": date_end.strftime("%d.%m.%Y"),
             "nightsfrom": nights_from,
             "nightsto": nights_to,
             "adults": params.adults,

@@ -10,8 +10,12 @@
 from __future__ import annotations
 
 import re
+import logging
 from datetime import date, timedelta
 from typing import Optional
+
+# Настройка логгера
+logger = logging.getLogger(__name__)
 
 from app.agent.state import (
     AgentState,
@@ -159,6 +163,15 @@ def extract_entities_regex(text: str) -> dict:
     text_lower = text.lower()
     entities = {}
     
+    # ==================== ГОРЯЩИЕ ТУРЫ / СРОЧНО ====================
+    # Если пользователь хочет "горящий тур" — дата = завтра
+    # НО: НЕ ставим nights автоматически! Агент ОБЯЗАН спросить.
+    if any(word in text_lower for word in ["горящ", "горячий", "срочно", "на ближайшие", "ближайший вылет"]):
+        entities["is_hot_tour"] = True
+        # Дата вылета = завтра (это разумный дефолт для "горящих")
+        entities["date_from"] = date.today() + timedelta(days=1)
+        # НЕ СТАВИМ nights! Агент ОБЯЗАН спросить "На сколько дней?"
+    
     # 1. Страна (из известного справочника)
     country_found = False
     for key, country in COUNTRIES_MAP.items():
@@ -271,18 +284,31 @@ def extract_entities_regex(text: str) -> dict:
     if dates_found:
         dates_found.sort()
         entities["date_from"] = dates_found[0]
+        # Помечаем, что дата ТОЧНАЯ (указан конкретный день)
+        # Это влияет на ширину окна поиска
+        entities["is_exact_date"] = True
         if len(dates_found) > 1:
             entities["date_to"] = dates_found[-1]
             entities["nights"] = (dates_found[-1] - dates_found[0]).days
     
     # 5. Количество ночей
+    # КРИТИЧНО: Валидация — nights не может быть > 21 без ЯВНОГО запроса!
     nights_match = re.search(r'(\d+)\s*(?:ноч|ночей|ночи|дней|дня|день)', text_lower)
     if nights_match:
         nights = int(nights_match.group(1))
-        if 1 <= nights <= 30:
+        # Разумный диапазон: 1-21 ночей (стандартные туры)
+        # Более 21 ночи — только если явно запросили (например "30 ночей")
+        if 1 <= nights <= 21:
             entities["nights"] = nights
             if "date_from" in entities and "date_to" not in entities:
                 entities["date_to"] = entities["date_from"] + timedelta(days=nights)
+        elif nights > 21 and nights <= 30:
+            # Длинный тур — помечаем явно, но принимаем
+            entities["nights"] = nights
+            entities["long_stay_explicit"] = True
+            if "date_from" in entities and "date_to" not in entities:
+                entities["date_to"] = entities["date_from"] + timedelta(days=nights)
+        # Если > 30 — игнорируем (скорее всего ошибка/галлюцинация)
     
     # 6. Количество взрослых
     # ВАЖНО: Извлекаем даже если > 6 (для эскалации групповых заявок)
@@ -291,21 +317,25 @@ def extract_entities_regex(text: str) -> dict:
         adults = int(adults_match.group(1))
         if 1 <= adults <= 20:  # Разрешаем до 20 для групп
             entities["adults"] = adults
+            entities["adults_explicit"] = True  # ЯВНО указано пользователем!
     
     # Слова для количества (только если не нашли число)
     if "adults" not in entities:
         if re.search(r'вдво[её]м|двое|на двоих|для двоих', text_lower):
             entities["adults"] = 2
+            entities["adults_explicit"] = True
         elif re.search(r'втро[её]м|трое|на троих|для троих', text_lower):
             entities["adults"] = 3
+            entities["adults_explicit"] = True
         elif re.search(r'вчетвером|четверо|на четверых', text_lower):
             entities["adults"] = 4
+            entities["adults_explicit"] = True
         elif re.search(r'один|одного|сам\b|одна\b', text_lower):
             entities["adults"] = 1
+            entities["adults_explicit"] = True
     
-    # По умолчанию 2 взрослых (только если вообще не нашли)
-    if "adults" not in entities and any(word in text_lower for word in ["тур", "отдых", "поехать", "слетать", "хочу в", "хотим в"]):
-        entities["adults"] = 2
+    # УБРАНО: Дефолтное adults=2 — теперь агент ОБЯЗАН спросить!
+    # Если adults не указан явно — НЕ подставляем дефолт
     
     # 7. Дети (КРИТИЧНО: возраст ОБЯЗАТЕЛЕН!)
     children_ages = []
@@ -371,6 +401,7 @@ def extract_entities_regex(text: str) -> dict:
     for key, food_type in FOOD_TYPE_MAP.items():
         if key in text_lower:
             entities["food_type"] = food_type
+            entities["food_type_updated"] = True  # Флаг: обновлено в текущем шаге
             break
     
     # 9. Звёздность
@@ -379,6 +410,7 @@ def extract_entities_regex(text: str) -> dict:
         stars = int(stars_match.group(1))
         if 3 <= stars <= 5:
             entities["stars"] = stars
+            entities["stars_updated"] = True  # Флаг: обновлено в текущем шаге
     
     # 10. Название отеля (поиск по известным) + автоопределение страны
     for key, (hotel_name, hotel_country) in KNOWN_HOTELS_WITH_COUNTRY.items():
@@ -507,8 +539,12 @@ async def extract_entities_with_llm(text: str, awaiting_phone: bool = False) -> 
                     # Разрешаем до 20 для групповых заявок
                     if not (1 <= llm_entities["adults"] <= 20):
                         del llm_entities["adults"]
+                    else:
+                        # КРИТИЧНО: если LLM нашёл adults — это явное указание!
+                        llm_entities["adults_explicit"] = True
             
-            # nights: str -> int (валидация 1-30)
+            # nights: str -> int (валидация 1-21, max 30)
+            # КРИТИЧНО: nights > 21 — подозрительно (галлюцинация), > 30 — точно ошибка
             if "nights" in llm_entities:
                 val = llm_entities["nights"]
                 if isinstance(val, str):
@@ -517,8 +553,13 @@ async def extract_entities_with_llm(text: str, awaiting_phone: bool = False) -> 
                     except ValueError:
                         del llm_entities["nights"]
                 if isinstance(llm_entities.get("nights"), int):
-                    if not (1 <= llm_entities["nights"] <= 30):
+                    nights_val = llm_entities["nights"]
+                    # Отсекаем галлюцинации типа "364 ночи"
+                    if nights_val > 30 or nights_val < 1:
                         del llm_entities["nights"]
+                    elif nights_val > 21:
+                        # Длинный тур — оставляем, но с осторожностью
+                        llm_entities["long_stay_explicit"] = True
             
             # stars: str -> int (валидация 3-5)
             if "stars" in llm_entities:
@@ -655,6 +696,58 @@ async def input_analyzer(state: AgentState) -> AgentState:
             state["flex_days"] = 2  # Базовый диапазон для нового поиска
             return state
     
+    # ==================== CONTEXT AWARENESS: Интерпретация коротких ответов ====================
+    # Если пользователь ввёл только число (например "5"), смотрим контекст последнего вопроса
+    user_text_stripped = user_text.strip()
+    last_question = state.get("last_question_type")
+    
+    if user_text_stripped.isdigit() and last_question:
+        number = int(user_text_stripped)
+        current_params = state["search_params"].copy() if state["search_params"] else {}
+        
+        if last_question == "nights" and 1 <= number <= 21:
+            # "5" в ответ на "На сколько ночей?" → nights=5
+            current_params["nights"] = number
+            state["search_params"] = current_params
+            state["last_question_type"] = None  # Сбрасываем контекст
+            
+            # Пересчитываем cascade_stage (импорт уже вверху файла)
+            missing = get_missing_required_params(current_params)
+            cascade_stage = get_cascade_stage(current_params)
+            state["missing_info"] = missing
+            state["intent"] = "search_tour"
+            state["cascade_stage"] = cascade_stage
+            return state
+        
+        elif last_question == "adults" and 1 <= number <= 10:
+            # "2" в ответ на "Сколько человек?" → adults=2
+            current_params["adults"] = number
+            current_params["adults_explicit"] = True
+            state["search_params"] = current_params
+            state["last_question_type"] = None
+            
+            missing = get_missing_required_params(current_params)
+            cascade_stage = get_cascade_stage(current_params)
+            state["missing_info"] = missing
+            state["intent"] = "search_tour"
+            state["cascade_stage"] = cascade_stage
+            return state
+        
+        elif last_question == "stars" and 3 <= number <= 5:
+            # "5" в ответ на "Какой уровень отеля?" → stars=5
+            current_params["stars"] = number
+            current_params["skip_quality_check"] = True
+            state["search_params"] = current_params
+            state["last_question_type"] = None
+            state["quality_check_asked"] = True
+            
+            missing = get_missing_required_params(current_params)
+            cascade_stage = get_cascade_stage(current_params)
+            state["missing_info"] = missing
+            state["intent"] = "search_tour"
+            state["cascade_stage"] = cascade_stage
+            return state
+    
     result = await extract_entities_with_llm(user_text, awaiting_phone)
     intent = result.get("intent", "search_tour")
     entities = result.get("entities", {})
@@ -733,6 +826,16 @@ async def input_analyzer(state: AgentState) -> AgentState:
         # Не нужно спрашивать звёздность — отель конкретный
         current_params["skip_quality_check"] = True
     
+    # ==================== АНТИ-ЗАЦИКЛИВАНИЕ: Если stars/food_type обновлены — пропускаем ====================
+    # КРИТИЧНО: Если пользователь ответил на вопрос о звёздах/питании — НЕ спрашиваем повторно!
+    stars_updated = entities.get("stars_updated", False)
+    food_type_updated = entities.get("food_type_updated", False)
+    
+    if stars_updated or food_type_updated:
+        # Пользователь уже ответил — пропускаем quality_check
+        current_params["skip_quality_check"] = True
+        state["quality_check_asked"] = True  # Помечаем что уже спрашивали
+    
     # Проверка "мне всё равно" — может быть в любом сообщении
     # ВАЖНО: Не устанавливаем дефолтные stars/food_type при "мне всё равно"
     # Это позволит найти все доступные варианты
@@ -780,12 +883,26 @@ async def faq_handler(state: AgentState) -> AgentState:
     """Обработка FAQ."""
     intent = state.get("intent", "")
     
+    # ==================== АНТИ-ПОВТОРНОЕ ПРИВЕТСТВИЕ ====================
+    # Если это "greeting" intent в середине диалога — отвечаем кратко
+    if intent == "greeting":
+        messages_count = len(state.get("messages", []))
+        already_greeted = state.get("greeted", False)
+        
+        if already_greeted or messages_count > 2:
+            # Уже здоровались — отвечаем кратко
+            state["response"] = "Чем могу помочь?"
+        else:
+            # Первое приветствие
+            state["response"] = "Здравствуйте! Я консультант турагентства МГП. Чем могу помочь?"
+            state["greeted"] = True
+        return state
+    
     if intent in FAQ_RESPONSES:
         state["response"] = FAQ_RESPONSES[intent]
     else:
         state["response"] = "К сожалению, не нашёл ответ. Свяжитесь с менеджером."
     
-    # После FAQ НЕ ставим greeted (это FAQ, не приветствие диалога)
     return state
 
 
@@ -878,25 +995,52 @@ async def tour_searcher(state: AgentState) -> AgentState:
     """Поиск туров."""
     params = state["search_params"]
     
-    # ЖЁСТКАЯ ПРОВЕРКА: без города вылета не ищем!
-    if not params.get("departure_city"):
-        state["missing_info"] = ["departure_city"]
-        return state
+    # ==================== STRICT QUALIFICATION GUARDRAILS ====================
+    # КРИТИЧНО: НЕ ЗАПУСКАЕМ ПОИСК без обязательных параметров!
+    
+    # ==================== ГОРЯЩИЕ ТУРЫ: ТОЖЕ БЕЗ ДЕФОЛТОВ! ====================
+    # Даже для горящих туров агент ОБЯЗАН спрашивать состав и длительность
+    is_hot_tours = state.get("intent") == "hot_tours"
+    
+    # НЕТ ДЕФОЛТОВ! Даже для горящих туров проверяем ВСЕ параметры.
+    if not is_hot_tours:
+        # Для обычного поиска — СТРОГАЯ проверка
+        
+        # 1. Город вылета — ОБЯЗАТЕЛЬНО
+        if not params.get("departure_city"):
+            state["missing_info"] = ["departure_city"]
+            return state
+        
+        # 2. Дата вылета — ОБЯЗАТЕЛЬНО
+        if not params.get("date_from"):
+            state["missing_info"] = ["date_from"]
+            return state
+        
+        # 3. Состав (adults) — ОБЯЗАТЕЛЬНО и ЯВНО указан!
+        # КРИТИЧНО: НЕ подставляем adults=1 молча! Агент ОБЯЗАН спросить!
+        adults_explicit = params.get("adults_explicit", False)
+        adults = params.get("adults")
+        
+        if not adults or not adults_explicit:
+            # Агент ОБЯЗАН спросить: "Сколько человек полетит?"
+            state["missing_info"] = ["adults"]
+            state["intent"] = "ask_pax"  # Специальный intent для уточнения состава
+            return state
+        
+        # 4. Длительность (nights) — ОБЯЗАТЕЛЬНО!
+        if not params.get("nights"):
+            state["missing_info"] = ["nights"]
+            return state
+        
+        # 5. Страна назначения — ОБЯЗАТЕЛЬНО
+        if not params.get("destination_country"):
+            state["missing_info"] = ["destination_country"]
+            return state
     
     if state["missing_info"]:
         return state
     
     try:
-        # Проверка наличия обязательных параметров
-        if not params.get("date_from"):
-            state["error"] = "Не указана дата вылета"
-            state["tour_offers"] = []
-            return state
-        
-        if not params.get("destination_country"):
-            state["error"] = "Не указана страна назначения"
-            state["tour_offers"] = []
-            return state
         
         destination = Destination(
             country=params.get("destination_country"),
@@ -909,20 +1053,48 @@ async def tour_searcher(state: AgentState) -> AgentState:
         nights = params.get("nights", 7)
         
         # ==================== УМНЫЙ ДИАПАЗОН ДАТ ====================
-        # По умолчанию всегда ищем ±2 дня (чартеры летают не каждый день)
-        # После согласия клиента расширяем до ±5 дней
-        flex_days = state.get("flex_days", 2)  # По умолчанию ±2 дня
-        if state.get("flex_search"):
-            flex_days = max(flex_days, 5)  # Расширенный поиск после согласия
+        # КРИТИЧНО: Если указана ТОЧНАЯ дата — используем узкое окно!
+        # Точная дата: "15 февраля" → ±0-1 день
+        # Размытая дата: "в середине февраля" → ±2 дня
+        # После согласия пользователя: ±5 дней
         
+        is_exact_date = params.get("is_exact_date", False)
+        
+        if state.get("flex_search"):
+            # Пользователь согласился расширить поиск
+            flex_days = 5
+        elif is_exact_date:
+            # КРИТИЧНО: Точная дата — БЕЗ разброса! (±0 дней)
+            # Если пользователь сказал "15 февраля", ищем ТОЛЬКО 15 февраля
+            flex_days = 0
+        else:
+            # Размытая дата — стандартное окно
+            flex_days = state.get("flex_days", 2)
+        
+        # Для точных дат: ищем именно указанную дату + длительность
+        # Для размытых: добавляем flex_days в обе стороны
         date_from = original_date_from - timedelta(days=flex_days)
         date_to = original_date_from + timedelta(days=flex_days + nights)
         
         # Сохраняем оригинальную дату для сообщения
         state["original_date_from"] = original_date_from
         
+        # КРИТИЧНО: adults уже проверен выше — дефолт НЕ используем!
+        # ==================== КРИТИЧНО: ГОРОД ВЫЛЕТА БЕЗ ДЕФОЛТА ====================
+        # Город вылета СТРОГО из параметров, НЕ Москва по умолчанию!
+        departure_city = params.get("departure_city")
+        
+        if not departure_city:
+            # Это не должно произойти — проверка выше
+            logger.error("❌ КРИТИЧЕСКАЯ ОШИБКА: departure_city не указан!")
+            state["missing_info"] = ["departure_city"]
+            return state
+        
+        # Логируем для отладки
+        logger.info(f"   ✈️ Город вылета: {departure_city}")
+        
         search_request = SearchRequest(
-            adults=params.get("adults", 2),
+            adults=params.get("adults"),  # Без дефолта! Проверено выше.
             children=params.get("children", []),
             destination=destination,
             hotel_name=params.get("hotel_name"),
@@ -930,7 +1102,7 @@ async def tour_searcher(state: AgentState) -> AgentState:
             date_from=date_from,
             date_to=date_to,
             food_type=params.get("food_type"),
-            departure_city=params.get("departure_city", "Москва")
+            departure_city=departure_city  # СТРОГО без дефолта!
         )
         
         # Загружаем справочники если ещё не загружены
@@ -951,14 +1123,116 @@ async def tour_searcher(state: AgentState) -> AgentState:
             )
             state["tour_offers"] = tours
         else:
-            # Обычный асинхронный поиск через search.php
-            result = await tourvisor_service.search_tours(search_request)
-            state["tour_offers"] = result.offers if result.found else []
+            # ==================== СТРОГИЙ ПОИСК ПО ОТЕЛЮ ====================
+            # Если hotel_name указан — ОБЯЗАТЕЛЬНО ищем через find_hotel_by_name
+            hotel_name = params.get("hotel_name")
+            hotel_ids = None
+            is_strict = False
             
-            # Сохраняем информацию о результате
-            if not result.found:
-                state["search_reason"] = result.reason
-                state["search_suggestion"] = result.suggestion
+            # Сохраняем информацию о найденном отеле для Smart Alternatives
+            found_hotel_info = None
+            
+            if hotel_name:
+                # Ищем ID отеля в справочнике
+                country_for_hotel = params.get("destination_country")
+                hotels_found = await tourvisor_service.find_hotel_by_name(
+                    query=hotel_name,
+                    country=country_for_hotel
+                )
+                
+                if hotels_found:
+                    hotel_ids = [h.hotel_id for h in hotels_found[:3]]
+                    is_strict = True
+                    # Сохраняем инфо о первом отеле для Smart Alternatives
+                    found_hotel_info = hotels_found[0]
+                    state["found_hotel_name"] = found_hotel_info.name
+                    state["found_hotel_stars"] = found_hotel_info.stars
+                    # HotelInfo использует region_name, не region
+                    state["found_hotel_region"] = getattr(found_hotel_info, 'region_name', '') or getattr(found_hotel_info, 'resort_name', '')
+                else:
+                    # ==================== FAIL-FAST: ОТЕЛЬ НЕ НАЙДЕН В СПРАВОЧНИКЕ ====================
+                    state["tour_offers"] = []
+                    state["hotel_not_found"] = True
+                    state["response"] = (
+                        f"К сожалению, я не нашёл отель «{hotel_name}» в базе Tourvisor.\n\n"
+                        f"Уточните название или давайте посмотрим другие варианты в {country_for_hotel}."
+                    )
+                    return state
+            
+            # Определяем, горящий ли это тур
+            is_hot_tour_search = (
+                state.get("intent") == "hot_tours" or 
+                params.get("is_hot_tour", False)
+            )
+            
+            # Обычный асинхронный поиск через search.php
+            result = await tourvisor_service.search_tours(
+                search_request,
+                is_strict_hotel_search=is_strict,
+                hotel_ids=hotel_ids,
+                is_hot_tour=is_hot_tour_search  # Расширенное окно для горящих!
+            )
+            
+            # ==================== SMART ALTERNATIVES ====================
+            # Если отель найден в справочнике, но туров нет — ищем альтернативы!
+            if is_strict and found_hotel_info and (not result.found or not result.offers):
+                # Туров в конкретный отель нет — ищем альтернативы
+                hotel_stars = found_hotel_info.stars or 5
+                # HotelInfo использует region_name, не region
+                hotel_region = getattr(found_hotel_info, 'region_name', '') or getattr(found_hotel_info, 'resort_name', '')
+                hotel_display_name = found_hotel_info.name
+                
+                # Создаём запрос для поиска альтернатив (по региону и звёздности)
+                alt_search_request = SearchRequest(
+                    adults=params.get("adults"),  # Без дефолта!
+                    children=params.get("children", []),
+                    destination=Destination(
+                        country=params.get("destination_country"),
+                        region=hotel_region  # Тот же регион
+                    ),
+                    stars=hotel_stars,  # Те же звёзды
+                    date_from=date_from,
+                    date_to=date_to,
+                    food_type=params.get("food_type"),
+                    departure_city=params.get("departure_city", "Москва")
+                )
+                
+                # Поиск альтернатив (БЕЗ строгого фильтра по отелю)
+                alt_result = await tourvisor_service.search_tours(
+                    alt_search_request,
+                    is_strict_hotel_search=False,
+                    hotel_ids=None
+                )
+                
+                if alt_result.found and alt_result.offers:
+                    # Исключаем исходный отель из альтернатив
+                    filtered_offers = [
+                        offer for offer in alt_result.offers
+                        if offer.hotel_name.lower() != hotel_display_name.lower()
+                    ][:5]
+                    
+                    if filtered_offers:
+                        state["tour_offers"] = filtered_offers
+                        state["smart_alternatives"] = True
+                        state["original_hotel_name"] = hotel_display_name
+                        state["original_hotel_stars"] = hotel_stars
+                        state["original_hotel_region"] = hotel_region or country_for_hotel
+                    else:
+                        # Альтернатив тоже нет
+                        state["tour_offers"] = []
+                        state["no_alternatives"] = True
+                else:
+                    # Альтернатив нет
+                    state["tour_offers"] = []
+                    state["no_alternatives"] = True
+                    state["search_reason"] = result.reason
+                    state["search_suggestion"] = result.suggestion
+            else:
+                state["tour_offers"] = result.offers if result.found else []
+                
+                if not result.found:
+                    state["search_reason"] = result.reason
+                    state["search_suggestion"] = result.suggestion
         
     except Exception as e:
         state["error"] = f"Ошибка поиска: {str(e)}"
@@ -1030,6 +1304,10 @@ async def responder(state: AgentState) -> AgentState:
     - Каскад вопросов в правильном порядке
     - Умное объяснение "нет результатов"
     """
+    # КРИТИЧНО: Если ответ уже был установлен (например, hotel_not_found) — не перезаписываем
+    if state.get("hotel_not_found") and state.get("response"):
+        return state
+    
     # Ошибка
     if state.get("error"):
         state["response"] = f"Произошла ошибка: {state['error']}. Попробуйте ещё раз."
@@ -1039,22 +1317,41 @@ async def responder(state: AgentState) -> AgentState:
     cascade_stage = get_cascade_stage(params)
     is_first = state.get("is_first_message", False) and not state.get("greeted", False)
     
-    # Найденные туры — новый формат без "Нашёл X вариантов"
+    # Найденные туры — новый формат с подтверждением
     if state["tour_offers"]:
         offers = state["tour_offers"]
         country = params.get("destination_country", "")
+        hotel_name = params.get("hotel_name", "")
         date_from = params.get("date_from")
         
         # Формируем краткий контекст для заголовка
         date_str = date_from.strftime("%d.%m") if date_from else ""
-        header = f"Вот варианты в {country}"
-        if date_str:
-            header += f" на {date_str}"
-        header += ":"
+        
+        # ==================== SMART ALTERNATIVES RESPONSE ====================
+        if state.get("smart_alternatives"):
+            # Это альтернативы, а не исходный отель!
+            original_hotel = state.get("original_hotel_name", hotel_name)
+            original_stars = state.get("original_hotel_stars", 5)
+            original_region = state.get("original_hotel_region", country)
+            
+            header = (
+                f"К сожалению, в {original_hotel} на эти даты туров нет (места закончились).\n\n"
+                f"Но я подобрал похожие варианты {original_stars}★ в регионе {original_region}:"
+            )
+        else:
+            # Обычная выдача
+            if hotel_name:
+                header = f"Вот туры в {hotel_name}"
+            else:
+                header = f"Вот варианты в {country}"
+            
+            if date_str:
+                header += f" на {date_str}"
+            header += ":"
         
         # Добавляем предупреждение о сезоне (мягкое, одной фразой)
         season_warning = ""
-        if date_from and country:
+        if date_from and country and not state.get("smart_alternatives"):
             month = date_from.month
             off_season, _ = is_off_season(country, month)
             if off_season and country == "Турция":
@@ -1068,44 +1365,142 @@ async def responder(state: AgentState) -> AgentState:
     
     # КАСКАД ВОПРОСОВ (строгий порядок)
     
+    # ==================== ФОРМИРОВАНИЕ КОНТЕКСТА ====================
+    # Собираем что УЖЕ знаем для подтверждения в ответе
+    hotel_name = params.get("hotel_name", "")
+    country = params.get("destination_country", "")
+    departure = params.get("departure_city", "")
+    date_from = params.get("date_from")
+    date_str = date_from.strftime("%d.%m") if date_from else ""
+    adults = params.get("adults", 0)
+    
+    # Формируем подтверждение понятого
+    confirmation_parts = []
+    if hotel_name:
+        confirmation_parts.append(f"отель {hotel_name}")
+    if country and not hotel_name:
+        confirmation_parts.append(country)
+    if date_str:
+        confirmation_parts.append(f"на {date_str}")
+    if adults:
+        confirmation_parts.append(f"на {adults} чел.")
+    
+    confirmation = ", ".join(confirmation_parts) if confirmation_parts else ""
+    
     # Этап 1: нужна страна
     if cascade_stage == 1:
-        if is_first:
+        # ==================== АНТИ-ПОВТОРНОЕ ПРИВЕТСТВИЕ ====================
+        # КРИТИЧНО: Если в истории > 2 сообщений — НЕ используем стартовое приветствие!
+        messages_count = len(state.get("messages", []))
+        already_greeted = state.get("greeted", False)
+        
+        if is_first and not already_greeted and messages_count <= 2:
             state["response"] = "Здравствуйте! Я консультант турагентства МГП. В какую страну планируете поездку?"
             state["greeted"] = True
         else:
+            # В середине диалога — кратко и по делу
             state["response"] = "В какую страну планируете поездку?"
         return state
     
     # Этап 2: нужен город вылета (ОБЯЗАТЕЛЬНО!)
     if cascade_stage == 2:
-        country = params.get("destination_country", "")
-        state["response"] = f"{country} — отличный выбор. Из какого города планируете вылет?"
+        # ВАЖНО: Подтверждаем отель если он упомянут!
+        if hotel_name:
+            state["response"] = f"Отличный выбор! Ищу туры именно в {hotel_name} ({country}). Из какого города планируете вылет?"
+        else:
+            state["response"] = f"{country} — отличный выбор. Из какого города планируете вылет?"
         return state
     
     # Этап 3: нужны даты
     if cascade_stage == 3:
-        departure = params.get("departure_city", "")
-        state["response"] = f"Понял, вылет из {departure}. Когда планируете отпуск?"
+        if hotel_name:
+            state["response"] = f"Понял, {hotel_name}, вылет из {departure}. Когда планируете отпуск?"
+        else:
+            state["response"] = f"Понял, вылет из {departure}. Когда планируете отпуск?"
         return state
     
-    # Этап 4: нужен состав
+    # Этап 4: нужен состав (adults) И длительность (nights)
+    # КРИТИЧНО: Агент ОБЯЗАН спросить состав, не подставляя дефолт!
     if cascade_stage == 4:
-        state["response"] = "Принято. Сколько человек поедет?"
+        adults_explicit = params.get("adults_explicit", False)
+        has_adults = params.get("adults") and adults_explicit
+        has_nights = params.get("nights")
+        
+        # ==================== КРИТИЧНО: СПРАШИВАЕМ СОСТАВ ====================
+        # Если adults не указан — ОБЯЗАТЕЛЬНО спрашиваем!
+        if not has_adults and not has_nights:
+            # Оба параметра отсутствуют — спрашиваем ночи первыми
+            question = "На сколько ночей планируете поездку?"
+            state["last_question_type"] = "nights"  # Контекст для ответа "5"
+        elif not has_adults:
+            # КРИТИЧНО: Нет состава — агент ОБЯЗАН спросить!
+            question = "Сколько человек полетит? Укажите количество взрослых и детей (с возрастом)."
+            state["last_question_type"] = "adults"  # Контекст для ответа "2"
+        elif not has_nights:
+            question = "На сколько ночей планируете поездку?"
+            state["last_question_type"] = "nights"  # Контекст для ответа "7"
+        else:
+            # Всё есть — переходим к следующему этапу (не должно сюда попасть)
+            question = "Сколько человек и на сколько ночей?"
+            state["last_question_type"] = "nights"
+        
+        if confirmation:
+            state["response"] = f"Принято: {confirmation}. {question}"
+        else:
+            state["response"] = question
         return state
     
-    # Этап 5: нужны детали
+    # Этап 5: нужны детали (пропускаем если отель известен!)
     if cascade_stage == 5:
-        context = format_context(params)
-        state["response"] = f"Понял: {context}.\n\nКакой уровень отеля — 5 звёзд всё включено или рассмотрим варианты?"
-        state["quality_check_asked"] = True
-        return state
+        # Если отель уже известен — НЕ спрашиваем звёздность!
+        if hotel_name:
+            # Принудительно переходим к поиску
+            state["cascade_stage"] = 6
+            # Не возвращаемся — продолжаем к поиску
+        else:
+            context = format_context(params)
+            state["response"] = f"Понял: {context}.\n\nКакой уровень отеля — 5 звёзд всё включено или рассмотрим варианты?"
+            state["quality_check_asked"] = True
+            state["last_question_type"] = "stars"  # Контекст для ответа "5"
+            return state
     
     # Этап 6 (cascade_stage == 6): всё собрано, но туров нет
     # Это значит поиск был выполнен, но вернул 0 результатов
     
     # Увеличиваем счётчик попыток
     state["search_attempts"] = state.get("search_attempts", 0) + 1
+    
+    # ==================== ЧЕСТНЫЙ ОТВЕТ: НЕТ ТУРОВ С ФИЛЬТРАМИ ====================
+    # Если поиск вернул reason="no_tours_with_filters" — предлагаем альтернативы
+    search_reason = state.get("search_reason")
+    
+    if search_reason == "no_tours_with_filters":
+        stars = params.get("stars")
+        food = params.get("food_type")
+        country = params.get("destination_country", "")
+        
+        # Формируем ЧЕСТНОЕ сообщение с предложением
+        if stars:
+            alt_stars = stars - 1 if stars > 3 else None
+            if alt_stars:
+                state["response"] = (
+                    f"К сожалению, отелей {stars}★ на эти даты в {country} не найдено.\n\n"
+                    f"Посмотреть варианты {alt_stars}★ или изменить даты?"
+                )
+                state["awaiting_agreement"] = True
+                state["pending_action"] = "lower_stars"
+                state["alt_stars"] = alt_stars
+            else:
+                state["response"] = (
+                    f"К сожалению, туров на эти даты в {country} не найдено.\n"
+                    f"Попробуйте изменить даты или город вылета."
+                )
+        else:
+            state["response"] = (
+                f"К сожалению, туров в {country} на указанные даты не найдено.\n"
+                f"Попробуйте изменить даты или город вылета."
+            )
+        return state
     
     response_text, awaiting, action = generate_no_results_explanation(params, state)
     state["response"] = response_text
@@ -1258,7 +1653,11 @@ def should_search(state: AgentState) -> str:
         return "ask"
     
     # Если нужны детали — quality_check
+    # НО: Если отель уже известен или skip_quality_check — пропускаем!
     if cascade_stage == 5 and not state.get("quality_check_asked"):
+        # Пропускаем quality_check если отель известен или явно указано skip
+        if params.get("hotel_name") or params.get("skip_quality_check"):
+            return "search"
         return "quality_check"
     
     # Иначе — поиск
