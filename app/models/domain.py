@@ -280,6 +280,14 @@ class TourOffer(BaseModel):
     # Туроператор
     operator: str = Field(description="Название туроператора")
     
+    # Туристы
+    adults: int = Field(default=2, ge=1, description="Количество взрослых")
+    children: int = Field(default=0, ge=0, description="Количество детей")
+    
+    # Изображение и ссылка
+    image: Optional[str] = Field(default=None, description="URL изображения отеля")
+    link: Optional[str] = Field(default=None, description="Ссылка на тур")
+    
     @property
     def price_formatted(self) -> str:
         """Форматированная цена."""
@@ -295,6 +303,59 @@ class TourOffer(BaseModel):
         """Форматированная длительность."""
         nights_word = "ночь" if self.nights == 1 else "ночей" if self.nights >= 5 else "ночи"
         return f"{self.nights} {nights_word}"
+    
+    @property
+    def meal_description(self) -> str:
+        """Полное описание типа питания на русском."""
+        meal_descriptions = {
+            FoodType.RO: "Без питания",
+            FoodType.BB: "Только завтрак",
+            FoodType.HB: "Завтрак и ужин",
+            FoodType.FB: "Полный пансион",
+            FoodType.AI: "Всё включено",
+            FoodType.UAI: "Ультра всё включено",
+        }
+        return meal_descriptions.get(self.food_type, self.food_type.value)
+    
+    @property
+    def stars_display(self) -> str:
+        """Звёзды для отображения (★★★★★)."""
+        return "★" * self.hotel_stars
+    
+    @property
+    def image_url(self) -> str:
+        """URL изображения отеля с fallback на placeholder."""
+        if self.hotel_photo and self.hotel_photo.startswith("http"):
+            return self.hotel_photo
+        # Tourvisor может возвращать относительные пути
+        if self.hotel_photo:
+            return f"https://images.tourvisor.ru{self.hotel_photo}"
+        # Генерируем красивый placeholder на основе названия страны
+        country_images = {
+            "турция": "https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=400&h=300&fit=crop",
+            "египет": "https://images.unsplash.com/photo-1539768942893-daf53e448371?w=400&h=300&fit=crop",
+            "оаэ": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400&h=300&fit=crop",
+            "таиланд": "https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?w=400&h=300&fit=crop",
+            "мальдивы": "https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=400&h=300&fit=crop",
+        }
+        country_lower = self.country.lower()
+        for key, url in country_images.items():
+            if key in country_lower:
+                return url
+        # Default placeholder
+        return "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=300&fit=crop"
+    
+    def model_dump(self, *args, **kwargs):
+        """Переопределяем для включения computed полей."""
+        data = super().model_dump(*args, **kwargs)
+        # Добавляем computed поля для фронтенда
+        data["meal_description"] = self.meal_description
+        data["stars_display"] = self.stars_display
+        data["image_url"] = self.image_url
+        data["price_formatted"] = self.price_formatted
+        data["dates_formatted"] = self.dates_formatted
+        data["duration_formatted"] = self.duration_formatted
+        return data
 
 
 class TourFilters(BaseModel):
@@ -418,4 +479,18 @@ class SearchResponse(BaseModel):
     search_id: Optional[str] = Field(
         default=None,
         description="ID поиска для пагинации"
+    )
+    
+    # Структурированный ответ при отсутствии результатов
+    found: bool = Field(
+        default=True,
+        description="Найдены ли туры"
+    )
+    reason: Optional[str] = Field(
+        default=None,
+        description="Причина отсутствия: no_flights, no_season, filters_too_strict"
+    )
+    suggestion: Optional[str] = Field(
+        default=None,
+        description="Рекомендация: try_changing_dates, try_moscow_departure"
     )

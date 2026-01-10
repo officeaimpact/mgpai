@@ -1,6 +1,7 @@
 /**
  * MGP Chat Widget - JavaScript
  * Сеть Магазинов Горящих Путевок
+ * Production Version with Rich Tour Cards
  */
 
 (function() {
@@ -13,7 +14,9 @@
         apiUrl: 'http://localhost:8000/api/v1/chat',
         botName: 'MGP AI',
         typingDelay: 500,
-        messageDelay: 100
+        messageDelay: 100,
+        maxVisibleCards: 3,  // Сколько карточек показывать изначально
+        imageLoadTimeout: 5000
     };
 
     // ============================================
@@ -21,6 +24,8 @@
     // ============================================
     let conversationId = null;
     let isTyping = false;
+    let allTourCards = [];  // Все полученные карточки
+    let visibleCardsCount = 0;  // Сколько карточек сейчас отображается
 
     // ============================================
     // DOM ELEMENTS
@@ -52,7 +57,7 @@
     }
 
     /**
-     * Format price with spaces
+     * Format price with spaces (Russian style)
      */
     function formatPrice(price) {
         if (!price) return '—';
@@ -60,7 +65,7 @@
     }
 
     /**
-     * Format date from ISO string
+     * Format date from ISO string to Russian format
      */
     function formatDate(dateStr) {
         if (!dateStr) return '';
@@ -73,10 +78,49 @@
     }
 
     /**
-     * Generate star rating
+     * Format short date (DD.MM)
+     */
+    function formatShortDate(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('ru-RU', { 
+            day: '2-digit', 
+            month: '2-digit'
+        });
+    }
+
+    /**
+     * Generate star rating display
      */
     function generateStars(count) {
         return '★'.repeat(count || 0);
+    }
+
+    /**
+     * Get nights word in Russian
+     */
+    function getNightsWord(nights) {
+        const n = nights % 100;
+        if (n >= 11 && n <= 19) return 'ночей';
+        const lastDigit = n % 10;
+        if (lastDigit === 1) return 'ночь';
+        if (lastDigit >= 2 && lastDigit <= 4) return 'ночи';
+        return 'ночей';
+    }
+
+    /**
+     * Get meal description in Russian
+     */
+    function getMealDescription(foodType) {
+        const descriptions = {
+            'RO': 'Без питания',
+            'BB': 'Только завтрак',
+            'HB': 'Завтрак и ужин',
+            'FB': 'Полный пансион',
+            'AI': 'Всё включено',
+            'UAI': 'Ультра всё включено'
+        };
+        return descriptions[foodType] || foodType || 'AI';
     }
 
     /**
@@ -89,9 +133,10 @@
     }
 
     /**
-     * Escape HTML
+     * Escape HTML to prevent XSS
      */
     function escapeHtml(text) {
+        if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
@@ -184,60 +229,126 @@
     }
 
     /**
-     * Create tour card HTML
+     * Create a single tour card HTML - PRODUCTION VERSION
      */
-    function createTourCardHTML(tour) {
-        const imageUrl = tour.hotel_photo || '';
-        const hasImage = imageUrl && imageUrl.length > 0;
+    function createTourCardHTML(tour, index) {
+        // Extract data with fallbacks
+        const hotelName = tour.hotel_name || 'Неизвестный отель';
+        const stars = tour.hotel_stars || 4;
+        const starsDisplay = tour.stars_display || generateStars(stars);
+        const rating = tour.hotel_rating;
+        const operator = tour.operator || '';
         
-        const imageHtml = hasImage 
-            ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(tour.hotel_name)}" class="tour-card-image" onerror="this.classList.add('placeholder'); this.innerHTML='🏨';">`
-            : `<div class="tour-card-image placeholder">🏨</div>`;
-
-        const stars = generateStars(tour.hotel_stars);
+        // Location
+        const country = tour.country || '';
+        const resort = tour.resort || tour.region || '';
+        const location = [country, resort].filter(Boolean).join(', ');
+        
+        // Dates
+        const dateFrom = formatShortDate(tour.date_from);
+        const dateTo = formatShortDate(tour.date_to);
+        const nights = tour.nights || 7;
+        const nightsWord = getNightsWord(nights);
+        
+        // Price
         const price = formatPrice(tour.price);
         const pricePerPerson = tour.price_per_person ? formatPrice(tour.price_per_person) : null;
-        const dateFrom = formatDate(tour.date_from);
         
-        const location = [tour.country, tour.resort].filter(Boolean).join(', ');
-        const hotelLink = tour.hotel_link || '#';
+        // Meal & Room
+        const mealDesc = tour.meal_description || getMealDescription(tour.food_type);
+        const foodCode = tour.food_type || 'AI';
+        const roomType = tour.room_type || 'Standard';
+        
+        // Image URL with intelligent fallback
+        const imageUrl = tour.image_url || tour.hotel_photo || getPlaceholderImage(country);
+        
+        // Links
+        const hotelLink = tour.hotel_link || tour.original_link || '#';
+        const tourId = tour.id || index;
+        
+        // Flight & departure info
+        const departureCity = tour.departure_city || 'Москва';
 
         return `
-            <div class="tour-card">
-                ${imageHtml}
+            <div class="tour-card" data-tour-id="${escapeHtml(String(tourId))}">
+                <div class="tour-card-image-container">
+                    <img 
+                        src="${escapeHtml(imageUrl)}" 
+                        alt="${escapeHtml(hotelName)}" 
+                        class="tour-card-image"
+                        loading="lazy"
+                        onerror="this.onerror=null; this.classList.add('placeholder'); this.parentElement.innerHTML='<div class=\\'tour-card-image placeholder\\'>🏨</div><div class=\\'tour-card-badge\\'>${starsDisplay}</div>';"
+                    >
+                    <div class="tour-card-badge">${starsDisplay}</div>
+                    ${rating ? `<div class="tour-card-rating">${rating.toFixed(1)}</div>` : ''}
+                    ${operator ? `<div class="tour-card-operator">${escapeHtml(operator)}</div>` : ''}
+                </div>
+                
                 <div class="tour-card-body">
-                    <div class="tour-card-price">
-                        ${price} ₽ 
-                        ${pricePerPerson ? `<span>/ ${pricePerPerson} ₽ за чел.</span>` : '<span>за номер</span>'}
+                    <div class="tour-card-hotel">${escapeHtml(hotelName)}</div>
+                    <div class="tour-card-location">
+                        <span class="icon">📍</span>
+                        <span>${escapeHtml(location)}</span>
                     </div>
-                    <ul class="tour-card-details">
-                        <li>
-                            <span class="icon">📍</span>
-                            <span class="text">${escapeHtml(location)}</span>
-                        </li>
-                        <li>
+                    
+                    <div class="tour-card-info">
+                        <div class="tour-card-info-item highlight">
+                            <span class="icon">✈️</span>
+                            <div>
+                                <div class="label">Перелёт</div>
+                                <div class="value">Включён (${escapeHtml(departureCity)})</div>
+                            </div>
+                        </div>
+                        <div class="tour-card-info-item">
                             <span class="icon">📅</span>
-                            <span class="text">${dateFrom}, <strong>${tour.nights || 7} ночей</strong></span>
-                        </li>
-                        <li>
-                            <span class="icon">🏨</span>
-                            <span class="text"><strong>${escapeHtml(tour.hotel_name)}</strong> ${stars}</span>
-                        </li>
-                        <li>
-                            <span class="icon">🛏</span>
-                            <span class="text">${escapeHtml(tour.room_type || 'Standard')}</span>
-                        </li>
-                        <li>
-                            <span class="icon">🍽</span>
-                            <span class="text">${escapeHtml(tour.food_type || 'AI')}</span>
-                        </li>
-                    </ul>
+                            <div>
+                                <div class="label">Даты</div>
+                                <div class="value">${dateFrom} – ${dateTo}</div>
+                            </div>
+                        </div>
+                        <div class="tour-card-info-item">
+                            <span class="icon">🌙</span>
+                            <div>
+                                <div class="label">Ночей</div>
+                                <div class="value">${nights} ${nightsWord}</div>
+                            </div>
+                        </div>
+                        <div class="tour-card-info-item">
+                            <span class="icon">🍽️</span>
+                            <div>
+                                <div class="label">Питание</div>
+                                <div class="value">${escapeHtml(mealDesc)}</div>
+                            </div>
+                        </div>
+                        <div class="tour-card-info-item">
+                            <span class="icon">🛏️</span>
+                            <div>
+                                <div class="label">Номер</div>
+                                <div class="value room-badge">${escapeHtml(roomType)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tour-card-price-section">
+                        <div class="tour-card-price">
+                            <div class="tour-card-price-value">
+                                ${price}<span class="currency">₽</span>
+                            </div>
+                            <div class="tour-card-price-label">за тур</div>
+                        </div>
+                        ${pricePerPerson ? `
+                            <div class="tour-card-price-per-person">
+                                <strong>${pricePerPerson} ₽</strong><br>за человека
+                            </div>
+                        ` : ''}
+                    </div>
+                    
                     <div class="tour-card-actions">
                         <a href="${escapeHtml(hotelLink)}" class="btn-book" target="_blank" rel="noopener">
-                            Оформить тур
+                            ✈️ Оформить тур
                         </a>
-                        <button class="btn-details" onclick="window.MGPChat.bookTour('${escapeHtml(tour.id || '')}')">
-                            Забронировать
+                        <button class="btn-details" onclick="window.MGPChat.bookTour('${escapeHtml(hotelName)}')">
+                            Забронировать через чат
                         </button>
                     </div>
                 </div>
@@ -246,12 +357,76 @@
     }
 
     /**
-     * Render tour cards carousel
+     * Get placeholder image based on country
      */
-    function renderTourCards(cards) {
+    function getPlaceholderImage(country) {
+        const countryLower = (country || '').toLowerCase();
+        const placeholders = {
+            'турция': 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=400&h=300&fit=crop',
+            'египет': 'https://images.unsplash.com/photo-1539768942893-daf53e448371?w=400&h=300&fit=crop',
+            'оаэ': 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400&h=300&fit=crop',
+            'таиланд': 'https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?w=400&h=300&fit=crop',
+            'мальдивы': 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=400&h=300&fit=crop',
+            'кипр': 'https://images.unsplash.com/photo-1580996647286-a60cae5f8f80?w=400&h=300&fit=crop',
+            'греция': 'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=400&h=300&fit=crop'
+        };
+        
+        for (const [key, url] of Object.entries(placeholders)) {
+            if (countryLower.includes(key)) {
+                return url;
+            }
+        }
+        
+        // Default beach image
+        return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=300&fit=crop';
+    }
+
+    /**
+     * Create "Show More" button
+     */
+    function createShowMoreButton(remainingCount) {
+        return `
+            <button class="btn-show-more" onclick="window.MGPChat.showMoreCards()">
+                <span class="icon">↓</span>
+                Показать ещё ${remainingCount} ${remainingCount === 1 ? 'тур' : remainingCount < 5 ? 'тура' : 'туров'}
+            </button>
+        `;
+    }
+
+    /**
+     * Render tour cards with horizontal carousel and navigation
+     */
+    function renderTourCards(cards, showAll = false) {
         if (!cards || cards.length === 0) return;
 
-        const cardsHtml = cards.map(card => createTourCardHTML(card)).join('');
+        // Store all cards for pagination
+        allTourCards = cards;
+        
+        // Determine how many cards to show
+        const cardsToShow = showAll ? cards : cards.slice(0, CONFIG.maxVisibleCards);
+        visibleCardsCount = cardsToShow.length;
+        
+        const cardsHtml = cardsToShow.map((card, index) => createTourCardHTML(card, index)).join('');
+        
+        // Check if we need "Show More" button
+        const remainingCount = cards.length - visibleCardsCount;
+        const showMoreHtml = remainingCount > 0 ? createShowMoreButton(remainingCount) : '';
+        
+        // Navigation arrows for desktop (when more than 1 card)
+        const navArrows = cardsToShow.length > 1 ? `
+            <div class="tour-cards-nav-arrows">
+                <button class="nav-prev" onclick="window.MGPChat.scrollCards(-1)" title="Предыдущий">‹</button>
+                <button class="nav-next" onclick="window.MGPChat.scrollCards(1)" title="Следующий">›</button>
+            </div>
+        ` : '';
+        
+        // Navigation hint
+        const navHint = `
+            <div class="tour-cards-nav">
+                <span class="tour-count">Найдено ${cards.length} ${cards.length === 1 ? 'тур' : cards.length < 5 ? 'тура' : 'туров'}</span>
+                ${cardsToShow.length > 1 ? '<span class="swipe-hint">← листайте →</span>' : ''}
+            </div>
+        `;
         
         const containerHtml = `
             <div class="message bot-message">
@@ -261,15 +436,13 @@
                     </svg>
                 </div>
                 <div class="message-content">
-                    <div class="tour-cards-container">
-                        <div class="tour-cards-wrapper">
+                    <div class="tour-cards-container" id="tourCardsContainer">
+                        ${navArrows}
+                        <div class="tour-cards-wrapper" id="tourCardsWrapper">
                             ${cardsHtml}
                         </div>
-                        ${cards.length > 1 ? `
-                            <div class="tour-cards-nav">
-                                <span>← Листайте для просмотра всех ${cards.length} предложений →</span>
-                            </div>
-                        ` : ''}
+                        ${navHint}
+                        ${showMoreHtml}
                     </div>
                 </div>
             </div>
@@ -277,6 +450,69 @@
 
         elements.messages.insertAdjacentHTML('beforeend', containerHtml);
         scrollToBottom();
+        
+        // Preload images
+        preloadCardImages(cardsToShow);
+    }
+    
+    /**
+     * Scroll cards in carousel by direction (-1 = prev, 1 = next)
+     */
+    function scrollCards(direction) {
+        const wrapper = document.getElementById('tourCardsWrapper');
+        if (!wrapper) return;
+        
+        const cardWidth = wrapper.querySelector('.tour-card')?.offsetWidth || 280;
+        const gap = 12;
+        const scrollAmount = (cardWidth + gap) * direction;
+        
+        wrapper.scrollBy({
+            left: scrollAmount,
+            behavior: 'smooth'
+        });
+    }
+
+    /**
+     * Show more tour cards
+     */
+    function showMoreCards() {
+        const wrapper = document.getElementById('tourCardsWrapper');
+        const container = document.getElementById('tourCardsContainer');
+        
+        if (!wrapper || !allTourCards.length) return;
+        
+        // Get remaining cards
+        const remainingCards = allTourCards.slice(visibleCardsCount);
+        
+        // Add remaining cards
+        remainingCards.forEach((card, index) => {
+            const cardHtml = createTourCardHTML(card, visibleCardsCount + index);
+            wrapper.insertAdjacentHTML('beforeend', cardHtml);
+        });
+        
+        visibleCardsCount = allTourCards.length;
+        
+        // Remove "Show More" button
+        const showMoreBtn = container.querySelector('.btn-show-more');
+        if (showMoreBtn) {
+            showMoreBtn.remove();
+        }
+        
+        scrollToBottom();
+        preloadCardImages(remainingCards);
+    }
+
+    /**
+     * Preload card images for better UX
+     */
+    function preloadCardImages(cards) {
+        cards.forEach(card => {
+            const imageUrl = card.image_url || card.hotel_photo;
+            if (imageUrl) {
+                const img = new Image();
+                img.src = imageUrl;
+            }
+        });
     }
 
     // ============================================
@@ -355,7 +591,7 @@
         } catch (error) {
             console.error('Chat error:', error);
             hideTyping();
-            addMessage('bot', '😔 Извините, произошла ошибка соединения. Пожалуйста, попробуйте позже или позвоните нам по телефону.');
+            addMessage('bot', 'Извините, произошла ошибка соединения. Пожалуйста, попробуйте позже или позвоните нам по телефону 8-800-XXX-XX-XX.');
         } finally {
             elements.sendBtn.disabled = false;
             elements.input.focus();
@@ -363,11 +599,11 @@
     }
 
     /**
-     * Book tour action
+     * Book tour action - sends booking request through chat
      */
-    function bookTour(tourId) {
-        const message = tourId 
-            ? `Хочу забронировать тур ${tourId}`
+    function bookTour(hotelName) {
+        const message = hotelName 
+            ? `Хочу забронировать тур в ${hotelName}`
             : 'Хочу забронировать тур';
         sendMessage(message);
     }
@@ -418,7 +654,7 @@
         // Generate initial conversation ID
         conversationId = generateUUID();
 
-        console.log('MGP Chat Widget initialized');
+        console.log('MGP Chat Widget initialized (Production Version)');
         console.log('Conversation ID:', conversationId);
     }
 
@@ -432,6 +668,8 @@
         toggle: toggleChat,
         send: sendMessage,
         bookTour: bookTour,
+        showMoreCards: showMoreCards,
+        scrollCards: scrollCards,
         getConversationId: () => conversationId
     };
 

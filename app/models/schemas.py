@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Optional
 from pydantic import BaseModel, Field
 
-from app.models.domain import TourOffer
+from typing import Any
 
 
 class ChatRequest(BaseModel):
@@ -42,9 +42,9 @@ class ChatResponse(BaseModel):
     reply: str = Field(
         description="Ответ ассистента"
     )
-    tour_cards: Optional[list[TourOffer]] = Field(
+    tour_cards: Optional[list[dict[str, Any]]] = Field(
         default=None,
-        description="Найденные предложения туров (3-5 карточек)"
+        description="Найденные предложения туров (3-5 карточек) с полными данными для UI"
     )
     conversation_id: str = Field(
         description="ID диалога"

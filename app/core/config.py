@@ -21,11 +21,13 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     
-    # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8080"]
+    # CORS (разрешаем все origins для разработки)
+    CORS_ORIGINS: list[str] = ["*"]
     
     # Tourvisor API
-    TOURVISOR_API_KEY: str = ""
+    TOURVISOR_API_KEY: str = ""  # Deprecated: use AUTH_LOGIN/AUTH_PASS
+    TOURVISOR_AUTH_LOGIN: str = ""  # Логин для классической авторизации
+    TOURVISOR_AUTH_PASS: str = ""   # Пароль для классической авторизации
     TOURVISOR_BASE_URL: str = "http://tourvisor.ru/xml"
     TOURVISOR_TIMEOUT: int = 30  # Таймаут запросов в секундах
     TOURVISOR_MOCK: bool = True  # Mock-режим для тестирования без API

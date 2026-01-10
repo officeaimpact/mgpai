@@ -100,9 +100,14 @@ async def chat(request: ChatRequest) -> ChatResponse:
         # Получаем карточки туров (если есть)
         tour_cards = new_state.get("tour_offers", [])
         
+        # Сериализуем карточки с computed полями (image_url, meal_description, etc.)
+        serialized_cards = None
+        if tour_cards:
+            serialized_cards = [card.model_dump() for card in tour_cards]
+        
         return ChatResponse(
             reply=reply,
-            tour_cards=tour_cards if tour_cards else None,
+            tour_cards=serialized_cards if serialized_cards else None,
             conversation_id=conversation_id
         )
         

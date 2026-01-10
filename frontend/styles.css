@@ -1,6 +1,7 @@
 /* ============================================
    MGP Chat Widget Styles
    Сеть Магазинов Горящих Путевок
+   Production Version
    ============================================ */
 
 /* CSS Variables */
@@ -10,18 +11,28 @@
     --mgp-red-light: #ff1a27;
     --mgp-green: #27AE60;
     --mgp-green-dark: #1e8449;
+    --mgp-green-light: #2ecc71;
     --mgp-blue: #E3F2FD;
-    --mgp-gray-light: #F5F5F5;
+    --mgp-blue-dark: #1976D2;
+    --mgp-orange: #F39C12;
+    --mgp-gold: #FFD700;
+    --mgp-gray-light: #F8F9FA;
     --mgp-gray: #E0E0E0;
+    --mgp-gray-medium: #BDBDBD;
     --mgp-gray-dark: #9E9E9E;
-    --mgp-text: #333333;
-    --mgp-text-light: #666666;
+    --mgp-text: #2C3E50;
+    --mgp-text-light: #7F8C8D;
+    --mgp-text-muted: #95A5A6;
     --mgp-white: #FFFFFF;
     --mgp-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    --mgp-shadow-light: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --mgp-shadow-light: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --mgp-shadow-card: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --mgp-shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.18);
     --mgp-radius: 16px;
-    --mgp-radius-sm: 8px;
+    --mgp-radius-sm: 10px;
+    --mgp-radius-xs: 6px;
     --mgp-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --mgp-transition-fast: all 0.15s ease;
 }
 
 /* Reset & Base */
@@ -36,7 +47,7 @@ body {
     font-size: 14px;
     line-height: 1.5;
     color: var(--mgp-text);
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     min-height: 100vh;
 }
 
@@ -56,12 +67,16 @@ body {
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 16px;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, #fff 0%, #e0e0e0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .demo-page p {
     font-size: 1.1rem;
-    opacity: 0.9;
+    opacity: 0.85;
     margin-bottom: 8px;
 }
 
@@ -75,10 +90,10 @@ body {
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: var(--mgp-red);
+    background: linear-gradient(135deg, var(--mgp-red) 0%, var(--mgp-red-dark) 100%);
     border: none;
     cursor: pointer;
-    box-shadow: var(--mgp-shadow);
+    box-shadow: 0 4px 20px rgba(227, 6, 19, 0.4);
     transition: var(--mgp-transition);
     z-index: 9999;
     display: flex;
@@ -88,9 +103,8 @@ body {
 }
 
 .chat-launcher:hover {
-    background: var(--mgp-red-dark);
-    transform: scale(1.05);
-    box-shadow: 0 6px 30px rgba(227, 6, 19, 0.4);
+    transform: scale(1.08);
+    box-shadow: 0 6px 30px rgba(227, 6, 19, 0.5);
 }
 
 .chat-launcher:active {
@@ -131,8 +145,8 @@ body {
     position: fixed;
     bottom: 100px;
     right: 24px;
-    width: 400px;
-    height: 600px;
+    width: 420px;
+    height: 650px;
     max-height: calc(100vh - 140px);
     background: var(--mgp-white);
     border-radius: var(--mgp-radius);
@@ -157,7 +171,7 @@ body {
    CHAT HEADER
    ============================================ */
 .chat-header {
-    background: var(--mgp-red);
+    background: linear-gradient(135deg, var(--mgp-red) 0%, var(--mgp-red-dark) 100%);
     padding: 16px 20px;
     display: flex;
     align-items: center;
@@ -172,18 +186,19 @@ body {
 }
 
 .chat-logo {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    backdrop-filter: blur(10px);
 }
 
 .chat-logo svg {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     color: white;
 }
 
@@ -194,7 +209,7 @@ body {
 }
 
 .chat-title-main {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     line-height: 1.2;
 }
@@ -209,7 +224,7 @@ body {
     width: 36px;
     height: 36px;
     border: none;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 50%;
     cursor: pointer;
     display: flex;
@@ -220,7 +235,8 @@ body {
 }
 
 .chat-close:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.25);
+    transform: rotate(90deg);
 }
 
 .chat-close svg {
@@ -251,7 +267,7 @@ body {
 }
 
 .chat-messages::-webkit-scrollbar-thumb {
-    background: var(--mgp-gray);
+    background: var(--mgp-gray-medium);
     border-radius: 3px;
 }
 
@@ -265,7 +281,7 @@ body {
 .message {
     display: flex;
     gap: 10px;
-    max-width: 90%;
+    max-width: 92%;
     animation: messageSlide 0.3s ease-out;
 }
 
@@ -290,14 +306,15 @@ body {
 }
 
 .message-avatar {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
-    background: var(--mgp-red);
+    background: linear-gradient(135deg, var(--mgp-red) 0%, var(--mgp-red-dark) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(227, 6, 19, 0.25);
 }
 
 .message-avatar svg {
@@ -307,36 +324,40 @@ body {
 }
 
 .user-message .message-avatar {
-    background: var(--mgp-blue);
+    background: linear-gradient(135deg, var(--mgp-blue-dark) 0%, #1565C0 100%);
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.25);
 }
 
 .user-message .message-avatar svg {
-    color: #1976D2;
+    color: white;
 }
 
 .message-content {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    max-width: 100%;
 }
 
 .message-bubble {
     padding: 12px 16px;
     border-radius: 18px;
-    line-height: 1.5;
+    line-height: 1.55;
     word-wrap: break-word;
+    font-size: 14px;
 }
 
 .bot-message .message-bubble {
     background: var(--mgp-white);
-    border-bottom-left-radius: 4px;
+    border-bottom-left-radius: 6px;
     box-shadow: var(--mgp-shadow-light);
+    color: var(--mgp-text);
 }
 
 .user-message .message-bubble {
-    background: var(--mgp-blue);
-    border-bottom-right-radius: 4px;
-    color: var(--mgp-text);
+    background: linear-gradient(135deg, var(--mgp-blue-dark) 0%, #1565C0 100%);
+    border-bottom-right-radius: 6px;
+    color: white;
 }
 
 .message-bubble strong {
@@ -361,10 +382,10 @@ body {
 .typing-dots {
     display: flex;
     gap: 4px;
-    padding: 12px 16px;
+    padding: 14px 18px;
     background: var(--mgp-white);
     border-radius: 18px;
-    border-bottom-left-radius: 4px;
+    border-bottom-left-radius: 6px;
     box-shadow: var(--mgp-shadow-light);
 }
 
@@ -386,165 +407,433 @@ body {
         background: var(--mgp-gray-dark);
     }
     30% {
-        transform: translateY(-6px);
+        transform: translateY(-8px);
         background: var(--mgp-red);
     }
 }
 
 /* ============================================
-   TOUR CARDS CAROUSEL
+   TOUR CARDS CAROUSEL CONTAINER
    ============================================ */
 .tour-cards-container {
     display: flex;
     flex-direction: column;
     gap: 12px;
     width: 100%;
+    max-width: 100%;
+    position: relative;
 }
 
 .tour-cards-wrapper {
     display: flex;
+    flex-direction: row;
     gap: 12px;
     overflow-x: auto;
-    padding-bottom: 8px;
+    overflow-y: hidden;
+    padding: 4px 4px 12px 4px;
     scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
 }
 
+/* Hide scrollbar for cleaner look */
 .tour-cards-wrapper::-webkit-scrollbar {
-    height: 4px;
+    height: 6px;
 }
 
 .tour-cards-wrapper::-webkit-scrollbar-track {
     background: var(--mgp-gray);
-    border-radius: 2px;
+    border-radius: 3px;
 }
 
 .tour-cards-wrapper::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, var(--mgp-red), #ff6b6b);
+    border-radius: 3px;
+}
+
+.tour-cards-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--mgp-red-dark);
+}
+
+/* Firefox scrollbar */
+.tour-cards-wrapper {
+    scrollbar-width: thin;
+    scrollbar-color: var(--mgp-red) var(--mgp-gray);
+}
+
+/* Navigation Arrows */
+.tour-cards-nav-arrows {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: 10;
+}
+
+.tour-cards-nav-arrows button {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--mgp-white);
+    border: 1px solid var(--mgp-gray);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: var(--mgp-text);
+    transition: var(--mgp-transition);
+}
+
+.tour-cards-nav-arrows button:hover {
     background: var(--mgp-red);
-    border-radius: 2px;
+    color: white;
+    border-color: var(--mgp-red);
+    transform: scale(1.1);
+}
+
+.tour-cards-nav-arrows button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.tour-cards-nav-arrows .nav-prev {
+    left: -18px;
+}
+
+.tour-cards-nav-arrows .nav-next {
+    right: -18px;
+}
+
+/* Show arrows on desktop only */
+@media (min-width: 768px) {
+    .tour-cards-nav-arrows {
+        display: block;
+    }
+    
+    .tour-cards-container:hover .tour-cards-nav-arrows button {
+        opacity: 1;
+    }
 }
 
 /* ============================================
-   TOUR CARD
+   TOUR CARD - COMPACT DESIGN (CAROUSEL)
    ============================================ */
 .tour-card {
-    min-width: 280px;
-    max-width: 280px;
-    background: var(--mgp-white);
-    border-radius: var(--mgp-radius-sm);
-    box-shadow: var(--mgp-shadow-light);
-    overflow: hidden;
-    scroll-snap-align: start;
-    transition: var(--mgp-transition);
+    min-width: 240px;
+    width: 240px;
+    max-width: 240px;
     flex-shrink: 0;
+    scroll-snap-align: start;
+    background: var(--mgp-white);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: var(--mgp-transition);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* On mobile, cards take 80% width so next card peeks */
+@media (max-width: 767px) {
+    .tour-card {
+        min-width: 75%;
+        width: 75%;
+        max-width: 75%;
+        scroll-snap-align: center;
+    }
 }
 
 .tour-card:hover {
-    box-shadow: var(--mgp-shadow);
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* Card Image - COMPACT */
+.tour-card-image-container {
+    position: relative;
+    width: 100%;
+    height: 130px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
 }
 
 .tour-card-image {
     width: 100%;
-    height: 140px;
+    height: 100%;
     object-fit: cover;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    transition: transform 0.4s ease;
+}
+
+.tour-card:hover .tour-card-image {
+    transform: scale(1.05);
 }
 
 .tour-card-image.placeholder {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    font-size: 48px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 40px;
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
 }
 
+/* Image Badge - Stars (COMPACT) */
+.tour-card-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    color: var(--mgp-gold);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Rating Badge (COMPACT) */
+.tour-card-rating {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(39, 174, 96, 0.95);
+    color: white;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.tour-card-rating::before {
+    content: "★";
+    color: var(--mgp-gold);
+    font-size: 9px;
+}
+
+/* Operator Badge (COMPACT) */
+.tour-card-operator {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--mgp-text);
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 500;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Card Body (COMPACT) */
 .tour-card-body {
-    padding: 14px;
+    padding: 10px 12px 12px;
+}
+
+/* Hotel Name (COMPACT) */
+.tour-card-hotel {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--mgp-text);
+    margin-bottom: 2px;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Location (COMPACT) */
+.tour-card-location {
+    font-size: 11px;
+    color: var(--mgp-text-light);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tour-card-location .icon {
+    color: var(--mgp-red);
+    font-size: 12px;
+}
+
+/* Info Grid */
+/* Info Grid (COMPACT) */
+.tour-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+    padding: 8px;
+    background: var(--mgp-gray-light);
+    border-radius: 6px;
+}
+
+.tour-card-info-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tour-card-info-item .icon {
+    font-size: 12px;
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.tour-card-info-item .label {
+    display: none; /* Hide labels in compact mode */
+}
+
+.tour-card-info-item .value {
+    font-size: 11px;
+    color: var(--mgp-text);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tour-card-info-item.full-width {
+    grid-column: 1 / -1;
+}
+
+/* Flight info highlight (COMPACT) */
+.tour-card-info-item.highlight {
+    background: linear-gradient(135deg, rgba(39, 174, 96, 0.12) 0%, rgba(46, 204, 113, 0.06) 100%);
+    padding: 5px 6px;
+    border-radius: 4px;
+    margin: -2px -2px 2px -2px;
+}
+
+.tour-card-info-item.highlight .icon {
+    color: var(--mgp-green);
+}
+
+.tour-card-info-item.highlight .value {
+    color: var(--mgp-green);
+    font-weight: 600;
+}
+
+/* Room type badge (COMPACT) */
+.tour-card-info-item .value.room-badge {
+    background: var(--mgp-gray);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    display: inline-block;
+}
+
+/* Price Section (COMPACT) */
+.tour-card-price-section {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--mgp-gray);
 }
 
 .tour-card-price {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--mgp-text);
-    margin-bottom: 12px;
-}
-
-.tour-card-price span {
-    font-size: 13px;
-    font-weight: 400;
-    color: var(--mgp-text-light);
-}
-
-.tour-card-details {
-    list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-bottom: 14px;
-    font-size: 13px;
 }
 
-.tour-card-details li {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    color: var(--mgp-text-light);
-}
-
-.tour-card-details li .icon {
-    flex-shrink: 0;
-    width: 18px;
-    text-align: center;
-}
-
-.tour-card-details li .text {
-    line-height: 1.4;
-}
-
-.tour-card-details li strong {
+.tour-card-price-value {
+    font-size: 18px;
+    font-weight: 800;
     color: var(--mgp-text);
-    font-weight: 500;
+    line-height: 1;
 }
 
+.tour-card-price-value .currency {
+    font-size: 13px;
+    font-weight: 600;
+    margin-left: 1px;
+}
+
+.tour-card-price-label {
+    font-size: 10px;
+    color: var(--mgp-text-light);
+    margin-top: 2px;
+}
+
+.tour-card-price-per-person {
+    font-size: 10px;
+    color: var(--mgp-text-muted);
+    text-align: right;
+}
+
+.tour-card-price-per-person strong {
+    color: var(--mgp-text-light);
+    font-weight: 600;
+}
+
+/* Action Buttons */
+/* Actions (COMPACT) */
 .tour-card-actions {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .btn-book {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
     width: 100%;
-    padding: 12px 16px;
-    background: var(--mgp-green);
+    padding: 10px 12px;
+    background: linear-gradient(135deg, var(--mgp-green) 0%, var(--mgp-green-dark) 100%);
     color: white;
     text-align: center;
     text-decoration: none;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
-    border-radius: var(--mgp-radius-sm);
+    border-radius: 6px;
     border: none;
     cursor: pointer;
     transition: var(--mgp-transition);
+    box-shadow: 0 2px 8px rgba(39, 174, 96, 0.25);
 }
 
 .btn-book:hover {
-    background: var(--mgp-green-dark);
+    background: linear-gradient(135deg, var(--mgp-green-light) 0%, var(--mgp-green) 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(39, 174, 96, 0.35);
+}
+
+.btn-book:active {
+    transform: translateY(0);
 }
 
 .btn-details {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     width: 100%;
-    padding: 10px 16px;
+    padding: 8px 12px;
     background: transparent;
     color: var(--mgp-red);
     text-align: center;
     text-decoration: none;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 500;
     border: 1px solid var(--mgp-red);
-    border-radius: var(--mgp-radius-sm);
+    border-radius: 6px;
     cursor: pointer;
     transition: var(--mgp-transition);
 }
@@ -554,18 +843,67 @@ body {
     color: white;
 }
 
-/* Tour cards navigation */
-.tour-cards-nav {
+/* Show More Button */
+.btn-show-more {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding-top: 4px;
+    width: 100%;
+    padding: 14px 20px;
+    background: var(--mgp-white);
+    color: var(--mgp-text);
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    border: 2px solid var(--mgp-gray);
+    border-radius: var(--mgp-radius-sm);
+    cursor: pointer;
+    transition: var(--mgp-transition);
+    margin-top: 8px;
 }
 
-.tour-cards-nav span {
+.btn-show-more:hover {
+    background: var(--mgp-gray-light);
+    border-color: var(--mgp-gray-medium);
+}
+
+.btn-show-more .icon {
+    font-size: 16px;
+    transition: transform 0.3s ease;
+}
+
+.btn-show-more:hover .icon {
+    transform: translateY(3px);
+}
+
+/* Tour cards navigation hint */
+.tour-cards-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 4px 0;
+    gap: 8px;
+}
+
+.tour-cards-nav .tour-count {
     font-size: 12px;
-    color: var(--mgp-text-light);
+    color: var(--mgp-text-muted);
+    font-weight: 500;
+}
+
+.tour-cards-nav .swipe-hint {
+    font-size: 11px;
+    color: var(--mgp-text-muted);
+    background: var(--mgp-gray);
+    padding: 4px 10px;
+    border-radius: 12px;
+    animation: pulseHint 2s ease-in-out infinite;
+}
+
+@keyframes pulseHint {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
 }
 
 /* ============================================
@@ -586,18 +924,20 @@ body {
 
 .chat-input {
     flex: 1;
-    padding: 12px 16px;
-    border: 1px solid var(--mgp-gray);
-    border-radius: 24px;
+    padding: 14px 18px;
+    border: 2px solid var(--mgp-gray);
+    border-radius: 26px;
     font-size: 14px;
     font-family: inherit;
     outline: none;
     transition: var(--mgp-transition);
+    background: var(--mgp-gray-light);
 }
 
 .chat-input:focus {
     border-color: var(--mgp-red);
-    box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.1);
+    background: var(--mgp-white);
+    box-shadow: 0 0 0 4px rgba(227, 6, 19, 0.1);
 }
 
 .chat-input::placeholder {
@@ -605,10 +945,10 @@ body {
 }
 
 .chat-send {
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     border: none;
-    background: var(--mgp-red);
+    background: linear-gradient(135deg, var(--mgp-red) 0%, var(--mgp-red-dark) 100%);
     border-radius: 50%;
     cursor: pointer;
     display: flex;
@@ -617,11 +957,12 @@ body {
     color: white;
     transition: var(--mgp-transition);
     flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(227, 6, 19, 0.3);
 }
 
 .chat-send:hover {
-    background: var(--mgp-red-dark);
-    transform: scale(1.05);
+    transform: scale(1.08);
+    box-shadow: 0 6px 20px rgba(227, 6, 19, 0.4);
 }
 
 .chat-send:active {
@@ -632,23 +973,24 @@ body {
     background: var(--mgp-gray);
     cursor: not-allowed;
     transform: none;
+    box-shadow: none;
 }
 
 .chat-send svg {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
 }
 
 .chat-powered {
     text-align: center;
     font-size: 11px;
-    color: var(--mgp-gray-dark);
-    margin-top: 10px;
+    color: var(--mgp-text-muted);
+    margin-top: 12px;
 }
 
 .chat-powered span {
     color: var(--mgp-red);
-    font-weight: 500;
+    font-weight: 600;
 }
 
 /* ============================================
@@ -658,15 +1000,16 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 8px;
+    margin-top: 10px;
 }
 
 .quick-reply {
-    padding: 8px 14px;
+    padding: 10px 16px;
     background: var(--mgp-white);
-    border: 1px solid var(--mgp-red);
-    border-radius: 20px;
+    border: 2px solid var(--mgp-red);
+    border-radius: 22px;
     font-size: 13px;
+    font-weight: 500;
     color: var(--mgp-red);
     cursor: pointer;
     transition: var(--mgp-transition);
@@ -675,6 +1018,7 @@ body {
 .quick-reply:hover {
     background: var(--mgp-red);
     color: white;
+    transform: translateY(-2px);
 }
 
 /* ============================================
@@ -684,8 +1028,8 @@ body {
     .chat-launcher {
         bottom: 16px;
         right: 16px;
-        width: 56px;
-        height: 56px;
+        width: 58px;
+        height: 58px;
     }
 
     .chat-widget {
@@ -710,17 +1054,21 @@ body {
         font-size: 1rem;
     }
 
-    .tour-card {
-        min-width: 260px;
-        max-width: 260px;
+    .tour-cards-container {
+        max-width: 100%;
     }
 
-    .tour-card-image {
-        height: 120px;
+    .tour-cards-wrapper.horizontal .tour-card {
+        min-width: 270px;
+        max-width: 270px;
     }
 
-    .tour-card-price {
-        font-size: 18px;
+    .tour-card-image-container {
+        height: 160px;
+    }
+
+    .tour-card-price-value {
+        font-size: 22px;
     }
 
     .chat-header {
@@ -734,13 +1082,22 @@ body {
     .chat-footer {
         padding: 12px 16px;
     }
+
+    .chat-input {
+        padding: 12px 16px;
+    }
+
+    .chat-send {
+        width: 44px;
+        height: 44px;
+    }
 }
 
 /* Tablet */
 @media (min-width: 481px) and (max-width: 768px) {
     .chat-widget {
-        width: 360px;
-        height: 550px;
+        width: 380px;
+        height: 600px;
     }
 }
 
@@ -765,10 +1122,10 @@ body {
 
 @keyframes pulse {
     0%, 100% {
-        box-shadow: 0 0 0 0 rgba(227, 6, 19, 0.4);
+        box-shadow: 0 0 0 0 rgba(227, 6, 19, 0.5);
     }
     50% {
-        box-shadow: 0 0 0 12px rgba(227, 6, 19, 0);
+        box-shadow: 0 0 0 15px rgba(227, 6, 19, 0);
     }
 }
 
@@ -776,11 +1133,46 @@ body {
     animation: pulse 2s infinite;
 }
 
+/* Card loading animation */
+@keyframes cardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.tour-card {
+    animation: cardSlideIn 0.4s ease-out;
+}
+
+.tour-card:nth-child(2) { animation-delay: 0.1s; }
+.tour-card:nth-child(3) { animation-delay: 0.2s; }
+.tour-card:nth-child(4) { animation-delay: 0.3s; }
+.tour-card:nth-child(5) { animation-delay: 0.4s; }
+
+/* ============================================
+   IMAGE LOADING STATE
+   ============================================ */
+.tour-card-image.loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
 /* ============================================
    DARK MODE (optional)
    ============================================ */
 @media (prefers-color-scheme: dark) {
-    /* Виджет остается светлым для контрастности */
+    /* Widget stays light for contrast */
 }
 
 /* ============================================
