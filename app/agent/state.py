@@ -42,8 +42,26 @@ class PartialSearchParams(TypedDict, total=False):
     # Питание
     food_type: FoodType
     
+    # === НОВЫЕ ПАРАМЕТРЫ (GAP Analysis) ===
+    # Услуги отелей (ID для параметра services)
+    services: list[int]
+    
+    # Типы отелей (для параметра hoteltypes)
+    hotel_types: list[str]
+    
+    # Тип тура (для параметра tourtype)
+    tour_type: int
+    
     # Флаги
     skip_quality_check: bool
+    
+    # === STRICT SLOT FILLING FLAGS ===
+    # КРИТИЧНО: Эти флаги показывают, что параметр ЯВНО указан пользователем!
+    adults_explicit: bool       # adults указан явно ("2 человека", "вдвоём")
+    dates_confirmed: bool       # Дата указана явно ("15 февраля")
+    is_exact_date: bool         # Указана точная дата (не "в феврале")
+    children_mentioned: bool    # Упомянуты дети (нужен возраст)
+    children_count_mentioned: int  # Сколько детей упомянуто
 
 
 class Message(TypedDict):
@@ -67,6 +85,7 @@ class AgentState(TypedDict):
     selected_tour_id: Optional[str]
     cascade_stage: int
     quality_check_asked: bool
+    clarification_asked: bool  # Soft Clarification: спрашивали про звёзды/питание
     is_first_message: bool
     # Флаг: было ли приветствие
     greeted: bool
@@ -87,10 +106,29 @@ class AgentState(TypedDict):
     search_attempts: int
     # Флаг: уже предлагали другой город вылета
     offered_alt_departure: bool
+    # Флаг: уже предлагали другой тип питания (GAP Analysis: Smart Fallback)
+    offered_alt_food: bool
+    # Флаг: уже предлагали понизить звёзды (GAP Analysis: Smart Fallback)
+    offered_lower_stars: bool
     # КРИТИЧНО: количество детей, для которых нужен возраст
     missing_child_ages: int
     # Контекст последнего вопроса (для интерпретации коротких ответов типа "5")
     last_question_type: Optional[str]  # "nights", "adults", "stars", "dates", etc.
+    # === PAGINATION (GAP Analysis) ===
+    # ID последнего поискового запроса (для пагинации и continue)
+    last_search_id: Optional[str]
+    # ID страны последнего поиска
+    last_country_id: Optional[int]
+    # Текущая страница результатов
+    current_page: int
+    # Флаг: есть ли ещё результаты для загрузки
+    has_more_results: bool
+    
+    # === SEARCH MODE (Strict Slot Filling) ===
+    # "package" — пакетный тур (требует departure_city)
+    # "hotel_only" — только отель (НЕ требует departure_city)
+    # "burning" — горящие туры (гибкие даты)
+    search_mode: str  # "package" | "hotel_only" | "burning"
 
 
 # ==================== КАСКАД ВОПРОСОВ ====================
@@ -165,39 +203,51 @@ CLARIFICATION_QUESTIONS = {
 QUALITY_CHECK_QUESTION = "Какой уровень отеля — 5 звёзд всё включено или рассмотрим варианты?"
 
 
-def get_cascade_stage(params: PartialSearchParams) -> int:
+def get_cascade_stage(params: PartialSearchParams, search_mode: str = "package") -> int:
     """
     Определяет текущий этап каскада.
     
     СТРОГИЙ ПОРЯДОК (согласно ТЗ):
     1 — нужна страна
-    2 — нужен город вылета (ОБЯЗАТЕЛЬНО!)
+    2 — нужен город вылета (для package, НЕ для hotel_only!)
     3 — нужны даты
     4 — нужен состав (adults) И длительность (nights)
     5 — нужны детали (звёзды/питание) — для массовых направлений
     6 — всё собрано, можно искать
     
+    РЕЖИМЫ:
+    - "package" — пакетный тур (требует departure_city)
+    - "hotel_only" — только отель (НЕ требует departure_city)
+    - "burning" — горящие туры (гибкие даты)
+    
     КРИТИЧНО: Не запускаем поиск без adults и nights!
     """
     # Этап 1: нет страны
-    if not params.get("destination_country"):
+    # ИСКЛЮЧЕНИЕ: Если указан конкретный отель — страна будет определена из поиска отеля
+    if not params.get("destination_country") and not params.get("hotel_name"):
         return 1
     
-    # Этап 2: нет города вылета - БЛОКИРУЕМ ПОИСК!
-    if not params.get("departure_city"):
+    # Этап 2: нужен город вылета (ТОЛЬКО для package и burning!)
+    # Для hotel_only — пропускаем этот этап
+    # ВАЖНО: Даже при указании hotel_name требуем departure_city (если не hotel_only!)
+    if search_mode != "hotel_only" and not params.get("departure_city"):
         return 2
     
     # Этап 3: нет дат
-    if not params.get("date_from"):
+    # КРИТИЧНО: dates_confirmed показывает что дата ЯВНО указана
+    dates_confirmed = params.get("dates_confirmed", False)
+    has_date = params.get("date_from") and dates_confirmed
+    
+    if not has_date:
         return 3
     
     # Этап 4: нет состава ИЛИ длительности
-    # КРИТИЧНО: adults должен быть ЯВНО указан пользователем, не дефолт!
-    adults_explicit = params.get("adults_explicit", False)  # Флаг явного указания
+    # КРИТИЧНО: adults должен быть ЯВНО указан пользователем (adults_explicit)!
+    adults_explicit = params.get("adults_explicit", False)
     adults = params.get("adults")
     nights = params.get("nights")
     
-    # Если adults не указан явно ИЛИ nights не указан — спрашиваем
+    # Если adults не указан ЯВНО или nights не указан — спрашиваем
     if not adults or not adults_explicit or not nights:
         return 4
     
@@ -284,21 +334,38 @@ def is_off_season(country: str, month: int) -> tuple[bool, str]:
 
 
 def format_context(params: PartialSearchParams) -> str:
-    """Форматирует контекст (что уже известно) для ответа."""
+    """
+    Форматирует контекст (что уже известно) для ответа.
+    
+    КРИТИЧНО: Показываем ТОЛЬКО подтверждённые параметры!
+    - adults показываем только если adults_explicit=True
+    - date_from показываем только если dates_confirmed=True
+    - departure_city, destination_country показываем всегда (они не галлюцинируются)
+    """
     parts = []
     
+    # Страна — всегда показываем (не галлюцинируется)
     if params.get("destination_country"):
         parts.append(params["destination_country"])
     if params.get("destination_resort"):
         parts.append(params["destination_resort"])
+    
+    # Город вылета — всегда показываем (не галлюцинируется)
     if params.get("departure_city"):
         parts.append(f"из {params['departure_city']}")
-    if params.get("date_from"):
+    
+    # Дата — показываем ТОЛЬКО если dates_confirmed=True!
+    if params.get("date_from") and params.get("dates_confirmed"):
         d = params["date_from"]
         if isinstance(d, date):
-            nights = params.get("nights", 7)
-            parts.append(f"{d.strftime('%d.%m')}, {nights} ночей")
-    if params.get("adults"):
+            nights = params.get("nights")
+            if nights:
+                parts.append(f"{d.strftime('%d.%m')}, {nights} ночей")
+            else:
+                parts.append(f"{d.strftime('%d.%m')}")
+    
+    # Количество туристов — показываем ТОЛЬКО если adults_explicit=True!
+    if params.get("adults") and params.get("adults_explicit"):
         adults = params["adults"]
         children = params.get("children", [])
         
@@ -337,6 +404,7 @@ def create_initial_state() -> AgentState:
         selected_tour_id=None,
         cascade_stage=1,
         quality_check_asked=False,
+        clarification_asked=False,  # Soft Clarification
         is_first_message=True,
         greeted=False,
         is_group_request=False,
@@ -348,6 +416,15 @@ def create_initial_state() -> AgentState:
         pending_action=None,
         search_attempts=0,
         offered_alt_departure=False,
+        offered_alt_food=False,  # GAP Analysis: Smart Fallback по питанию
+        offered_lower_stars=False,  # GAP Analysis: Smart Fallback по звёздам
         missing_child_ages=0,
-        last_question_type=None  # Контекст для интерпретации "5" → nights/adults
+        last_question_type=None,  # Контекст для интерпретации "5" → nights/adults
+        # === PAGINATION (GAP Analysis) ===
+        last_search_id=None,
+        last_country_id=None,
+        current_page=1,
+        has_more_results=False,
+        # === SEARCH MODE (Strict Slot Filling) ===
+        search_mode="package"  # По умолчанию пакетный тур
     )

@@ -5,9 +5,10 @@ Tourvisor API Constants (Auto-Generated)
 ВНИМАНИЕ: Этот файл генерируется автоматически!
 Не редактируйте его вручную — изменения будут перезаписаны.
 
-Последняя синхронизация: 2026-01-10 21:03:33
+Последняя синхронизация: 2026-01-13 10:27:03
 Количество стран: 74
 Количество городов вылета: 78
+Количество услуг отелей: 30
 
 Для обновления запустите:
     python scripts/sync_tourvisor_data.py
@@ -15,7 +16,7 @@ Tourvisor API Constants (Auto-Generated)
 from __future__ import annotations
 
 # Время последней синхронизации
-LAST_SYNC = "2026-01-10T21:03:33.372576"
+LAST_SYNC = "2026-01-13T10:27:03.284218"
 
 # ==================== СТРАНЫ ====================
 # Формат: {"название_lowercase": id}
@@ -339,6 +340,127 @@ DEPARTURES: dict[str, int] = {
     "элиста": 131,
 }
 
+# ==================== УСЛУГИ ОТЕЛЕЙ (SERVICES) ====================
+# Формат: {"название_lowercase": id}
+# Используется для параметра services в search.php
+
+SERVICES: dict[str, int] = {
+    "водные горки для детей": 1,
+    "детское меню": 2,
+    "мини-клуб": 3,
+    "детская анимация": 4,
+    "детская площадка": 6,
+    "кухня": 7,
+    "балкон": 8,
+    "кондиционер": 12,
+    "можно с животными": 14,
+    "первая линия": 15,
+    "свой пляж": 16,
+    "песчаный пляж": 17,
+    "галечный пляж": 18,
+    "бассейн": 23,
+    "бассейн с подогревом": 24,
+    "водные горки": 25,
+    "spa": 26,
+    "ресторан или кафе": 27,
+    "спортзал": 28,
+    "теннис": 30,
+    "футбол": 31,
+    "анимация": 33,
+    "дискотека": 34,
+    "wi-fi": 36,
+    "одиноким мужчинам": 39,
+    "семейный": 44,
+    "vip": 45,
+    "гарантия мест": 46,
+    "только для взрослых": 48,
+    "новый отель": 49,
+}
+
+# ==================== МАППИНГ УСЛУГ (USER TEXT -> SERVICE ID) ====================
+# Маппинг пользовательских запросов в ID услуг Tourvisor
+# Пример: "хочу песчаный пляж" -> SERVICES_MAPPING["песчаный пляж"] -> [id1, id2]
+
+SERVICES_MAPPING: dict[str, list[int]] = {
+    # Тип пляжа
+    "песчаный пляж": [],  # Заполняется после синхронизации
+    "песок": [],
+    "галечный пляж": [],
+    "галька": [],
+    # Расположение
+    "1-я линия": [],
+    "первая линия": [],
+    "на берегу": [],
+    "у моря": [],
+    # Развлечения
+    "аквапарк": [],
+    "горки": [],
+    "водные горки": [],
+    # Для детей
+    "детский клуб": [],
+    "анимация": [],
+    "для детей": [],
+    # SPA и отдых
+    "спа": [],
+    "spa": [],
+    "бассейн": [],
+    "подогреваемый бассейн": [],
+}
+
+# ==================== ТИПЫ ОТЕЛЕЙ (HOTEL TYPES) ====================
+# Параметр hoteltypes для search.php
+# Значения: active, relax, family, health, city, beach, deluxe
+
+HOTEL_TYPES: dict[str, str] = {
+    # Семейный отдых
+    "семейный": "family",
+    "для семьи": "family",
+    "с детьми": "family",
+    "детский": "family",
+    # VIP / Люкс
+    "vip": "deluxe",
+    "вип": "deluxe",
+    "люкс": "deluxe",
+    "премиум": "deluxe",
+    "роскошный": "deluxe",
+    # Пляжный
+    "пляжный": "beach",
+    "на пляже": "beach",
+    "у моря": "beach",
+    # Городской
+    "городской": "city",
+    "в городе": "city",
+    # Активный отдых
+    "активный": "active",
+    "спортивный": "active",
+    "для активных": "active",
+    # Спокойный отдых
+    "спокойный": "relax",
+    "релакс": "relax",
+    "тихий": "relax",
+    # Оздоровительный
+    "оздоровительный": "health",
+    "лечебный": "health",
+    "санаторий": "health",
+}
+
+# ==================== ТИПЫ ТУРОВ (TOUR TYPES) ====================
+# Параметр tourtype для search.php
+
+TOUR_TYPES: dict[str, int] = {
+    "любой": 0,
+    "пляжный": 1,
+    "горнолыжный": 2,
+    "экскурсионный": 3,
+    # Алиасы
+    "пляж": 1,
+    "море": 1,
+    "лыжи": 2,
+    "горы": 2,
+    "экскурсии": 3,
+    "экскурсия": 3,
+}
+
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -372,4 +494,68 @@ def get_departure_name(departure_id: int) -> Optional[str]:
     for name, did in DEPARTURES.items():
         if did == departure_id and any(ord(c) > 127 for c in name):
             return name.title()
+    return None
+
+
+def get_service_ids(user_text: str) -> list[int]:
+    """
+    Извлечь ID услуг из пользовательского текста.
+    
+    Пример: "хочу отель с аквапарком и песчаным пляжем"
+    -> возвращает список ID услуг для параметра services
+    """
+    if not user_text:
+        return []
+    
+    text_lower = user_text.lower()
+    service_ids = set()
+    
+    # Ищем совпадения в SERVICES
+    for service_name, sid in SERVICES.items():
+        if service_name in text_lower:
+            service_ids.add(sid)
+    
+    # Ищем в маппинге
+    for keyword, ids in SERVICES_MAPPING.items():
+        if keyword in text_lower and ids:
+            service_ids.update(ids)
+    
+    return list(service_ids)
+
+
+def get_hotel_types(user_text: str) -> list[str]:
+    """
+    Извлечь типы отелей из пользовательского текста.
+    
+    Пример: "семейный отель на пляже"
+    -> возвращает ["family", "beach"]
+    """
+    if not user_text:
+        return []
+    
+    text_lower = user_text.lower()
+    hotel_types = set()
+    
+    for keyword, htype in HOTEL_TYPES.items():
+        if keyword in text_lower:
+            hotel_types.add(htype)
+    
+    return list(hotel_types)
+
+
+def get_tour_type(user_text: str) -> Optional[int]:
+    """
+    Определить тип тура из пользовательского текста.
+    
+    Пример: "горнолыжный курорт" -> 2
+    """
+    if not user_text:
+        return None
+    
+    text_lower = user_text.lower()
+    
+    for keyword, ttype in TOUR_TYPES.items():
+        if keyword in text_lower:
+            return ttype
+    
     return None

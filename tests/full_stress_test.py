@@ -28,8 +28,8 @@ import re
 # Добавляем корень проекта в PYTHONPATH
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.agent.graph import process_message, create_initial_state
-from app.agent.state import AgentState
+from app.agent.graph import process_message
+from app.agent.state import AgentState, create_initial_state
 from app.models.domain import TourOffer, FoodType, SearchResponse
 
 
@@ -581,8 +581,10 @@ class StressTestRunner:
                 
                 # Прогоняем все сообщения сценария
                 response = ""
+                # Генерируем уникальный thread_id для каждого теста
+                test_thread_id = f"test_{scenario.case_id}_{uuid.uuid4().hex[:8]}"
                 for message in scenario.messages:
-                    response, state = await process_message(message, state)
+                    response, state = await process_message(message, test_thread_id, state)
                 
                 result.actual_response = response
                 

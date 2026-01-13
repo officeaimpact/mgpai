@@ -70,18 +70,26 @@ class ResultType(Enum):
     RESULT = "result"
 
 
-# Маппинг типов питания для API
+# Маппинг типов питания для API (ID из справочника Tourvisor)
+# КРИТИЧНО: API требует числовые ID, не строки!
+# Источник: list.php?type=meal
 MEAL_TYPE_MAP = {
-    "RO": "nofood",
-    "BB": "breakfast",
-    "HB": "halfboard",
-    "FB": "fullboard",
-    "AI": "allinclusive",
-    "UAI": "ultraall",
+    "RO": 2,   # Room Only - Без питания
+    "BB": 3,   # Bed&Breakfast - Только завтрак
+    "HB": 4,   # Half Board - Завтрак + Ужин
+    "FB": 5,   # Full Board - Полный Пансион
+    "AI": 7,   # All Inclusive - Всё включено
+    "UAI": 9,  # Ultra All Inclusive - Ультра всё включено
 }
 
-# Обратный маппинг
+# Обратный маппинг (ID -> код)
 MEAL_TYPE_REVERSE = {v: k for k, v in MEAL_TYPE_MAP.items()}
+
+# ==================== КЕШИ РЕГИОНОВ (динамически загружаются) ====================
+# Загружаются через API list.php, НЕ хардкод!
+# Согласно "2. Справочники.docx"
+_REGIONS_CACHE: dict[int, list[dict]] = {}      # country_id -> list of regions
+_SUBREGIONS_CACHE: dict[int, list[dict]] = {}   # country_id -> list of subregions (курорты)
 
 
 # ==================== DATA CLASSES ====================
@@ -190,9 +198,12 @@ class TourvisorService:
         self._hotels_cache: dict[int, list[HotelInfo]] = {}  # country_id -> [hotels]
         
         # Конфигурация поллинга
-        self.poll_interval: float = 2.5  # секунды между запросами статуса
-        self.max_poll_attempts: int = 40  # ~100 секунд максимум
-        self.min_progress_to_fetch: int = 10  # начинаем забирать при 10%+
+        # КРИТИЧНО: GDS/регулярные рейсы грузятся ДОЛГО!
+        # Если обрываем рано — теряем большинство туров
+        self.poll_interval: float = 2.0  # секунды между запросами статуса
+        self.max_poll_attempts: int = 60  # ~120 секунд максимум
+        self.min_progress_to_fetch: int = 70  # Начинаем забирать при 70%+
+        self.min_wait_seconds: float = 25.0  # Минимум 25 секунд ожидания (GDS грузится долго!)
     
     # ==================== HTTP CLIENT ====================
     
@@ -424,6 +435,177 @@ class TourvisorService:
             # Краснодар
             "краснодар": 11,
         }
+    
+    async def load_dictionaries(self) -> bool:
+        """
+        System Startup Sync — загрузка всех критических справочников.
+        
+        Согласно "2. Справочники.docx":
+        - Страны: list.php?type=country
+        - Города вылета: list.php?type=departure
+        
+        Вызывать при инициализации сервиса или старте приложения.
+        
+        Returns:
+            True если загрузка успешна
+        """
+        logger.info("📚 System Startup Sync: загрузка справочников...")
+        
+        countries_ok = await self.load_countries()
+        departures_ok = await self.load_departures()
+        
+        if countries_ok and departures_ok:
+            logger.info(f"✅ Справочники загружены: {len(self._countries_cache)} стран, {len(self._departures_cache)} городов")
+            return True
+        else:
+            logger.error("❌ Ошибка загрузки справочников!")
+            return False
+    
+    async def load_regions_for_country(self, country_id: int) -> list[dict]:
+        """
+        Загрузка справочника регионов для страны.
+        
+        Метод: list.php?type=region&regcountry=ID
+        
+        Returns:
+            Список словарей с id и name регионов
+        """
+        global _REGIONS_CACHE
+        
+        if country_id in _REGIONS_CACHE:
+            return _REGIONS_CACHE[country_id]
+        
+        logger.info(f"🗺️ Загрузка регионов для страны {country_id}...")
+        
+        try:
+            response = await self._request("list.php", {
+                "type": "region",
+                "regcountry": country_id
+            })
+            
+            regions_data = (
+                response.get("lists", {}).get("regions", {}).get("region", []) or
+                response.get("data", {}).get("region", []) or
+                []
+            )
+            
+            if isinstance(regions_data, dict):
+                regions_data = [regions_data]
+            
+            regions = []
+            for r in regions_data:
+                rid = int(r.get("id", 0))
+                name = r.get("name", "")
+                if rid and name:
+                    regions.append({"id": rid, "name": name.lower()})
+            
+            _REGIONS_CACHE[country_id] = regions
+            logger.info(f"🗺️ Загружено {len(regions)} регионов для страны {country_id}")
+            return regions
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка загрузки регионов: {e}")
+            return []
+    
+    async def get_region_id_by_name(self, region_name: str, country_id: int) -> Optional[int]:
+        """
+        Динамический поиск ID региона по названию через API.
+        
+        Согласно "2. Справочники.docx":
+        1. Сначала ищем в regions (list.php?type=region)
+        2. Если не найден — ищем в subregions (list.php?type=subregion)
+        
+        Args:
+            region_name: Название региона (напр. "Сочи")
+            country_id: ID страны
+            
+        Returns:
+            ID региона или None если не найден
+        """
+        if not region_name or not country_id:
+            return None
+        
+        region_name_lower = region_name.lower().strip()
+        
+        # ШАГ 1: Ищем в основных регионах (type=region)
+        regions = await self.load_regions_for_country(country_id)
+        
+        # Точное совпадение в regions
+        for r in regions:
+            if r["name"] == region_name_lower:
+                logger.info(f"🗺️ Регион '{region_name}' → ID={r['id']} (region, точное)")
+                return r["id"]
+        
+        # Частичное совпадение в regions
+        for r in regions:
+            if region_name_lower in r["name"] or r["name"] in region_name_lower:
+                logger.info(f"🗺️ Регион '{region_name}' → ID={r['id']} (region, fuzzy: {r['name']})")
+                return r["id"]
+        
+        # ШАГ 2: Ищем в субрегионах/курортах (type=subregion)
+        subregions = await self.load_subregions_for_country(country_id)
+        
+        # Точное совпадение в subregions
+        for r in subregions:
+            if r["name"] == region_name_lower:
+                logger.info(f"🗺️ Субрегион '{region_name}' → ID={r['id']} (subregion, точное)")
+                return r["id"]
+        
+        # Частичное совпадение в subregions
+        for r in subregions:
+            if region_name_lower in r["name"] or r["name"] in region_name_lower:
+                logger.info(f"🗺️ Субрегион '{region_name}' → ID={r['id']} (subregion, fuzzy: {r['name']})")
+                return r["id"]
+        
+        logger.warning(f"⚠️ Регион/субрегион '{region_name}' не найден в стране {country_id}")
+        return None
+    
+    async def load_subregions_for_country(self, country_id: int) -> list[dict]:
+        """
+        Загрузка справочника субрегионов (курортов) для страны.
+        
+        Метод: list.php?type=subregion&regcountry=ID
+        Согласно "2. Справочники.docx", Source 44
+        
+        Returns:
+            Список словарей с id и name субрегионов
+        """
+        global _SUBREGIONS_CACHE
+        
+        if country_id in _SUBREGIONS_CACHE:
+            return _SUBREGIONS_CACHE[country_id]
+        
+        logger.info(f"🏖️ Загрузка субрегионов (курортов) для страны {country_id}...")
+        
+        try:
+            response = await self._request("list.php", {
+                "type": "subregion",
+                "regcountry": country_id
+            })
+            
+            subregions_data = (
+                response.get("lists", {}).get("subregions", {}).get("subregion", []) or
+                response.get("data", {}).get("subregion", []) or
+                []
+            )
+            
+            if isinstance(subregions_data, dict):
+                subregions_data = [subregions_data]
+            
+            subregions = []
+            for r in subregions_data:
+                rid = int(r.get("id", 0))
+                name = r.get("name", "")
+                if rid and name:
+                    subregions.append({"id": rid, "name": name.lower()})
+            
+            _SUBREGIONS_CACHE[country_id] = subregions
+            logger.info(f"🏖️ Загружено {len(subregions)} субрегионов для страны {country_id}")
+            return subregions
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка загрузки субрегионов: {e}")
+            return []
     
     async def load_hotels_for_country(self, country_id: int) -> list[HotelInfo]:
         """
@@ -659,17 +841,23 @@ class TourvisorService:
         self,
         query: str,
         country: Optional[str] = None,
-        country_id: Optional[int] = None
+        country_id: Optional[int] = None,
+        region: Optional[str] = None,
+        resort: Optional[str] = None
     ) -> list[HotelInfo]:
         """
         Поиск отелей по названию с поддержкой транслитерации.
+        
+        HOTEL FILTER FIX: Если указан region/resort, фильтруем результаты!
+        Это предотвращает проблему "Жемчужина в Махачкале" когда ищут Сочи.
         
         Поддерживает:
         - Русские названия: "Риксос" → "Rixos"
         - Частичное совпадение: "rixos" → "Rixos Premium Belek"
         - Нечувствительность к регистру
+        - Фильтрация по региону/курорту
         """
-        logger.info(f"\n🔍 Поиск отеля: '{query}'")
+        logger.info(f"\n🔍 Поиск отеля: '{query}'" + (f" в регионе: {region or resort}" if region or resort else ""))
         
         if self.mock_enabled:
             return []
@@ -683,7 +871,6 @@ class TourvisorService:
             cid = self.get_country_id(country)
             search_country_ids = [cid] if cid else []
         else:
-            # Популярные направления для поиска
             # Популярные направления (ID из tourvisor_constants.py)
             search_country_ids = [
                 COUNTRIES.get("турция", 4),
@@ -701,7 +888,12 @@ class TourvisorService:
         search_variants = self._normalize_hotel_query(query)
         logger.info(f"   🔤 Варианты поиска: {search_variants}")
         
+        # Нормализуем region/resort для сравнения
+        region_lower = region.lower() if region else None
+        resort_lower = resort.lower() if resort else None
+        
         results = []
+        filtered_by_region = []
         
         for cid in search_country_ids:
             hotels = await self.load_hotels_for_country(cid)
@@ -714,8 +906,49 @@ class TourvisorService:
                     if variant in hotel_name_lower:
                         if hotel not in results:  # Избегаем дублей
                             results.append(hotel)
-                            logger.info(f"   ✅ Найден: {hotel.name} ({hotel.stars}*)")
+                            
+                            # HOTEL FILTER FIX: Проверяем совпадение региона/курорта
+                            # ИСПРАВЛЕНО: Используем правильные атрибуты HotelInfo!
+                            if region_lower or resort_lower:
+                                # HotelInfo имеет: region_name, resort_name
+                                hotel_region = (hotel.region_name or '').lower()
+                                hotel_resort = (hotel.resort_name or '').lower()
+                                
+                                # Fuzzy matching: проверяем вхождение в обе стороны
+                                location_match = False
+                                search_terms = [region_lower, resort_lower]
+                                hotel_locations = [hotel_region, hotel_resort]
+                                
+                                for search_term in search_terms:
+                                    if not search_term:
+                                        continue
+                                    for hotel_loc in hotel_locations:
+                                        if not hotel_loc:
+                                            continue
+                                        # Двусторонний fuzzy match
+                                        if search_term in hotel_loc or hotel_loc in search_term:
+                                            location_match = True
+                                            break
+                                    if location_match:
+                                        break
+                                
+                                if location_match:
+                                    filtered_by_region.append(hotel)
+                                    logger.info(f"   ✅ Найден в {region or resort}: {hotel.name} ({hotel.stars}*) [region={hotel_region}, resort={hotel_resort}]")
+                            else:
+                                logger.info(f"   ✅ Найден: {hotel.name} ({hotel.stars}*)")
                         break
+        
+        # Если указан регион — применяем фильтрацию
+        if region_lower or resort_lower:
+            if filtered_by_region:
+                logger.info(f"   📊 Отфильтровано по региону '{region or resort}': {len(filtered_by_region)} из {len(results)} отелей")
+                return filtered_by_region
+            elif results:
+                # FALLBACK: Фильтрация дала 0, но общий поиск нашёл отели
+                # Возвращаем полный список чтобы не терять результаты из-за опечаток
+                logger.warning(f"   ⚠️ Фильтр по региону '{region or resort}' дал 0 результатов. Показываем все {len(results)} найденных отелей.")
+                return results
         
         if results:
             logger.info(f"   📊 Всего найдено: {len(results)} отелей")
@@ -784,24 +1017,50 @@ class TourvisorService:
         
         logger.info(f"   ✈️ Город вылета: '{params.departure_city}' → ID={departure_id}")
         
-        # Если указан отель — ищем его ID
+        # Если указан отель — ищем его ID (с фильтрацией по региону!)
         if params.hotel_name and not hotel_ids:
             logger.info(f"   🏨 Поиск отеля: {params.hotel_name}")
-            hotels = await self.find_hotel_by_name(params.hotel_name, country_id=country_id)
+            # HOTEL FILTER FIX: Передаём region/resort для фильтрации
+            hotels = await self.find_hotel_by_name(
+                params.hotel_name, 
+                country_id=country_id,
+                region=params.destination.region if params.destination else None,
+                resort=params.destination.resort if params.destination else None
+            )
             if hotels:
                 hotel_ids = [h.hotel_id for h in hotels[:5]]
                 logger.info(f"   ✅ ID отелей: {hotel_ids}")
             elif is_strict_hotel_search:
+                # ⛔ STOP: Строгий поиск по отелю, но ID не найдены — НЕ делаем общий поиск!
+                logger.warning(f"   ⛔ STOP: Strict hotel search for '{params.hotel_name}' but no IDs found. Returning empty.")
                 return SearchResponse(
                     offers=[], total_found=0, found=False,
-                    reason="hotel_not_found",
-                    suggestion="check_hotel_name"
+                    reason="hotel_not_found_in_db",
+                    suggestion=f"Отель '{params.hotel_name}' не найден в базе туроператоров"
                 )
+        
+        # ⛔ ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: Если strict поиск, но hotel_ids пустые — СТОП!
+        if is_strict_hotel_search and not hotel_ids:
+            logger.warning("⛔ STOP: Strict hotel search requested but no hotel_ids provided. Returning empty.")
+            return SearchResponse(
+                offers=[], total_found=0, found=False,
+                reason="hotel_not_found_in_db",
+                suggestion="Отель не найден в базе туроператоров"
+            )
+        
+        # === STEP 0.5: Динамический поиск ID региона через API ===
+        region_id = None
+        if params.destination and params.destination.region:
+            region_id = await self.get_region_id_by_name(
+                params.destination.region, 
+                country_id
+            )
         
         # === STEP 1: Инициируем поиск ===
         api_params = self._build_search_params(
             params, country_id, departure_id, hotel_ids,
-            is_hot_tour=is_hot_tour
+            is_hot_tour=is_hot_tour,
+            region_id=region_id
         )
         
         logger.info(f"   📡 Инициация поиска...")
@@ -827,29 +1086,37 @@ class TourvisorService:
                 request_id, country_id, is_strict_hotel_search, hotel_ids
             )
             
-            # ==================== СТРОГИЕ ФИЛЬТРЫ (NO SILENT FALLBACK) ====================
-            # Применяем фильтры ЧЕСТНО — если нет туров с указанными критериями,
-            # возвращаем ПУСТОЙ СПИСОК, а не подменяем результаты!
+            # ==================== СТРОГАЯ ФИЛЬТРАЦИЯ ПО ЗВЁЗДАМ ====================
+            # API Tourvisor НЕ гарантирует соответствие параметру starsfrom!
+            # Мы ОБЯЗАНЫ фильтровать на своей стороне для гарантии качества.
+            # НИКАКОГО SOFT FALLBACK — если клиент просил 5*, показываем ТОЛЬКО 5*!
             
-            if filters:
-                offers = self._apply_filters(offers, filters)
+            logger.info(f"   📊 API вернул {len(offers)} туров (onpage=100)")
             
-            if params.stars:
-                offers = [o for o in offers if o.hotel_stars == params.stars]
-                logger.info(f"   🏨 Фильтр {params.stars}*: осталось {len(offers)} туров")
+            if params.stars and offers:
+                original_count = len(offers)
+                min_stars = int(params.stars)
+                
+                # СТРОГИЙ ФИЛЬТР: оставляем ТОЛЬКО то, что просил клиент
+                filtered_offers = [
+                    o for o in offers 
+                    if isinstance(o.hotel_stars, int) and o.hotel_stars >= min_stars
+                ]
+                
+                logger.info(f"   🧹 STRICT FILTER {min_stars}*: было {original_count}, стало {len(filtered_offers)}")
+                
+                # Показываем статистику если были отсеяны отели
+                if original_count > len(filtered_offers):
+                    rejected = original_count - len(filtered_offers)
+                    logger.info(f"   ⛔ Отсеяно {rejected} отелей с меньшим кол-вом звёзд")
+                
+                offers = filtered_offers
             
-            if params.food_type:
-                offers = [o for o in offers if o.food_type == params.food_type]
-                logger.info(f"   🍽️ Фильтр {params.food_type.value}: осталось {len(offers)} туров")
-            
-            # НЕТ FALLBACK! Если туров нет — возвращаем пустой список честно.
-            # Агент (nodes.py) сам решит, что предложить клиенту.
-            
-            # Сортируем и лимитируем
+            # Сортируем по цене и берём СТРОГО 5 (лимит Pydantic!)
             offers = sorted(offers, key=lambda x: x.price)[:5]
             
             if offers:
-                logger.info(f"   ✅ Найдено туров: {len(offers)}")
+                logger.info(f"   ✅ Отдаём пользователю: {len(offers)} туров")
                 return SearchResponse(
                     offers=offers,
                     total_found=len(offers),
@@ -889,7 +1156,8 @@ class TourvisorService:
         hotel_ids: Optional[list[int]],
         expand_dates: bool = True,
         expand_nights: bool = True,
-        is_hot_tour: bool = False
+        is_hot_tour: bool = False,
+        region_id: Optional[int] = None  # ID региона (из API)
     ) -> dict:
         """
         Формирование параметров для search.php.
@@ -900,45 +1168,71 @@ class TourvisorService:
         - childage1, childage2...: возрасты детей (НЕ массив!)
         - hotels: список ID через запятую
         
-        КРИТИЧНО: Расширяем диапазон поиска для увеличения шансов найти туры!
-        - Даты вылета: date_from до date_from + 2 дня (или +7 для горящих)
-        - Ночи: nights до nights + 2 (если expand_nights=True)
+        КРИТИЧНО: Даты уже расширены в nodes.py — просто используем их!
         """
         # ==================== NO DEFAULTS: nights должен быть указан! ====================
         if not params.nights:
             logger.error("❌ КРИТИЧЕСКАЯ ОШИБКА: nights не указан!")
-            # Используем разумный fallback только для логирования, но это не должно происходить
             nights_from = 7
         else:
             nights_from = params.nights
         
         # Расширенный диапазон ночей: +2 ночи для гибкости
-        nights_to = (nights_from + 2) if expand_nights else nights_from
+        nights_to = nights_from + 2
         
-        # ==================== РАСШИРЕННОЕ ОКНО ДЛЯ ГОРЯЩИХ ====================
-        # Если горящий тур или дата очень близкая (< 3 дней) — расширяем до +7 дней
+        # ==================== ДАТЫ УЖЕ РАСШИРЕНЫ В NODES.PY ====================
+        # НЕ делаем дополнительных расширений — используем то, что пришло
         date_start = params.date_from
-        days_until_departure = (params.date_from - date.today()).days if params.date_from else 30
+        date_end = params.date_to or params.date_from
         
-        if is_hot_tour or days_until_departure < 3:
-            # Горящие туры: +7 дней (чартеры летают редко!)
-            date_end = params.date_from + timedelta(days=7)
-            logger.info(f"   🔥 Горящий тур: расширяем окно дат до +7 дней")
-        elif expand_dates:
-            date_end = params.date_from + timedelta(days=2)
+        logger.info(f"   📅 Даты из nodes.py: {date_start.strftime('%d.%m')} - {date_end.strftime('%d.%m')}")
+        
+        # ==================== DEPARTURE: ЖЕЛЕЗОБЕТОННАЯ ЛОГИКА ====================
+        # 1. Проверяем явный флаг search_mode из params
+        mode = getattr(params, "search_mode", "package")
+        
+        RUSSIA_COUNTRY_ID = 30  # ID России в Tourvisor
+        
+        # Проверяем: город вылета совпадает с назначением?
+        departure_city = params.departure_city.lower() if params.departure_city else ""
+        destination_city = ""
+        if params.destination:
+            destination_city = (params.destination.city or params.destination.resort or "").lower()
+        
+        is_same_city = departure_city and destination_city and (
+            departure_city in destination_city or destination_city in departure_city
+        )
+        
+        # Определяем нужен ли перелёт
+        is_russia = (country_id == RUSSIA_COUNTRY_ID)
+        is_hotel_only = (mode == "hotel_only")
+        no_departure = not departure_id
+        
+        # 2. ПРИНУДИТЕЛЬНО departure=0 если:
+        #    - Режим hotel_only
+        #    - Город вылета совпадает с назначением (Сочи -> Сочи)
+        #    - Нет departure_id
+        if is_hotel_only or is_same_city or no_departure:
+            final_departure_id = 0
+            logger.info(f"   🚗 FORCE GROUND SERVICE: departure=0 (mode={mode}, hotel_only={is_hotel_only}, same_city={is_same_city})")
+        elif is_russia and not departure_id:
+            # Россия без явного города вылета — наземка
+            final_departure_id = 0
+            logger.info(f"   🇷🇺 РОССИЯ без вылета: departure=0")
         else:
-            date_end = params.date_to or params.date_from
+            final_departure_id = departure_id
+            logger.info(f"   ✈️ ПЕРЕЛЁТ: departure={final_departure_id}")
         
         api_params = {
-            "departure": departure_id,
+            "departure": final_departure_id,
             "country": country_id,
             "datefrom": date_start.strftime("%d.%m.%Y"),
             "dateto": date_end.strftime("%d.%m.%Y"),
             "nightsfrom": nights_from,
             "nightsto": nights_to,
             "adults": params.adults,
-            # По умолчанию ищем ВСЕ туры (не только горящие)
-            # hideregular=0 означает показывать регулярные рейсы
+            # КРИТИЧНО: Показываем ВСЕ рейсы включая регулярные (GDS)!
+            "hideregular": 0,
         }
         
         # === ДЕТИ: передаём как childage1, childage2... ===
@@ -947,9 +1241,15 @@ class TourvisorService:
             for i, age in enumerate(params.children, 1):
                 api_params[f"childage{i}"] = age
         
-        # Регион/курорт
-        if params.destination.region:
-            api_params["region"] = params.destination.region
+        # Регион/курорт — используем параметр "regions" (множественное число!)
+        # Согласно "1. Поиск туров.docx", Source 185
+        if region_id:
+            api_params["regions"] = region_id  # CRITICAL: "regions", не "region"!
+            logger.info(f"   🗺️ Регион '{params.destination.region}' → regions={region_id}")
+        elif params.destination.region:
+            # Fallback: передаём текстом (не рекомендуется, но API может понять)
+            api_params["regions"] = params.destination.region
+            logger.warning(f"   ⚠️ Регион '{params.destination.region}' передаём текстом (ID не найден)")
         
         # === Конкретные отели (список через запятую) ===
         if hotel_ids:
@@ -966,6 +1266,51 @@ class TourvisorService:
         if params.food_type and params.food_type.value in MEAL_TYPE_MAP:
             api_params["meal"] = MEAL_TYPE_MAP[params.food_type.value]
         
+        # === УСЛУГИ ОТЕЛЕЙ (services) ===
+        # Передаются как список ID через запятую
+        if hasattr(params, 'services') and params.services:
+            api_params["services"] = ",".join(map(str, params.services))
+        
+        # === ТИПЫ ОТЕЛЕЙ (hoteltypes) ===
+        # Значения: active, relax, family, health, city, beach, deluxe
+        if hasattr(params, 'hotel_types') and params.hotel_types:
+            api_params["hoteltypes"] = ",".join(params.hotel_types)
+        
+        # === ТИП ТУРА (tourtype) ===
+        # 0=любой, 1=пляжный, 2=горнолыжный, 3=экскурсионный
+        if hasattr(params, 'tour_type') and params.tour_type is not None:
+            api_params["tourtype"] = params.tour_type
+        
+        # === ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ API ПАРАМЕТРОВ ===
+        logger.info(f"   📡 API params: nights={nights_from}-{nights_to}, "
+                   f"dates={date_start.strftime('%d.%m')}-{date_end.strftime('%d.%m')}, "
+                   f"adults={params.adults}, stars={params.stars}, meal={api_params.get('meal', 'any')}, "
+                   f"hideregular={api_params.get('hideregular', 'N/A')}")
+        
+        # === ПОЛНЫЙ URL ДЛЯ СРАВНЕНИЯ С БРАУЗЕРОМ ===
+        url_params = "&".join(f"{k}={v}" for k, v in api_params.items())
+        full_url = f"http://tourvisor.ru/xml/search.php?{url_params}&format=json"
+        logger.info(f"   🔗 ПОЛНЫЙ URL: {full_url}")
+        
+        # === ЭКВИВАЛЕНТНАЯ ССЫЛКА ДЛЯ БРАУЗЕРА TOURVISOR ===
+        browser_url = (
+            f"https://tourvisor.ru/tours/{params.destination.country.lower() if params.destination else 'turkey'}/"
+            f"?s_nights_from={nights_from}&s_nights_to={nights_to}"
+            f"&s_j_date_from={date_start.strftime('%d.%m.%Y')}&s_j_date_to={date_end.strftime('%d.%m.%Y')}"
+            f"&s_adults={params.adults}"
+            f"&s_flyfrom={final_departure_id}&s_country={country_id}"
+            f"&s_regular=1"  # Включаем регулярные рейсы
+            + (f"&s_stars={params.stars}" if params.stars else "")
+            + (f"&s_meal={api_params.get('meal', '')}" if api_params.get('meal') else "")
+        )
+        logger.info(f"   🌐 BROWSER URL: {browser_url}")
+        
+        # === 🔥 ДЕТЕКТОР ЛЖИ (TRUTH CHECK) ===
+        print(f"\n🔥 [TRUTH CHECK] SEARCH MODE: {getattr(params, 'tour_type', 'package')} | DEPARTURE ID: {api_params.get('departure')}")
+        print(f"🔥 [TRUTH CHECK] DATES SENT: {api_params.get('datefrom')} - {api_params.get('dateto')}")
+        print(f"🔥 [TRUTH CHECK] NIGHTS SENT: {api_params.get('nightsfrom')} - {api_params.get('nightsto')}")
+        print(f"🔥 [TRUTH CHECK] FINAL URL: http://tourvisor.ru/xml/search.php?{url_params}\n")
+        
         return api_params
     
     async def _poll_and_fetch_results(
@@ -973,40 +1318,64 @@ class TourvisorService:
         request_id: str,
         country_id: int,
         is_strict_hotel_search: bool,
-        hotel_ids: Optional[list[int]]
+        hotel_ids: Optional[list[int]],
+        onpage: int = 100  # УВЕЛИЧЕНО: запрашиваем 100 отелей для глубокой выборки
     ) -> list[TourOffer]:
         """
         Цикл опроса статуса и получения результатов.
         
-        Протокол:
-        1. result.php?type=status — проверяем progress
-        2. Когда progress > min_progress_to_fetch — забираем результаты
-        3. result.php?type=result — получаем данные
+        Протокол (УЛУЧШЕННЫЙ):
+        1. Ждём минимум min_wait_seconds (5 сек) перед первым fetch
+        2. result.php?type=status — проверяем progress
+        3. Забираем результаты при progress >= 50% ИЛИ state == finished
+        4. Перезабираем финальные результаты когда state == finished
+        
+        КРИТИЧНО: onpage=100 чтобы получить достаточную выборку для фильтрации!
         """
         all_offers = []
         fetched = False
+        start_time = asyncio.get_event_loop().time()
+        
+        logger.info(f"   🔄 Начинаем опрос результатов (request_id={request_id})")
         
         for attempt in range(1, self.max_poll_attempts + 1):
             await asyncio.sleep(self.poll_interval)
+            
+            elapsed = asyncio.get_event_loop().time() - start_time
             
             # === Проверяем статус ===
             status = await self._get_search_status(request_id)
             
             logger.info(f"   ⏳ [{attempt}/{self.max_poll_attempts}] "
-                       f"Progress: {status.progress}% | State: {status.state}")
+                       f"Progress: {status.progress}% | State: {status.state} | "
+                       f"Elapsed: {elapsed:.1f}s | Found: {len(all_offers)}")
+            
+            # === КРИТИЧНО: Ждём минимум 5 секунд перед первым fetch ===
+            if elapsed < self.min_wait_seconds:
+                continue
             
             # Если достаточный прогресс — забираем результаты
             if status.progress >= self.min_progress_to_fetch or status.state == "finished":
-                if not fetched or status.progress > 50:  # Перезабираем при 50%+
-                    offers = await self._fetch_results(
-                        request_id, country_id, is_strict_hotel_search, hotel_ids
-                    )
-                    if offers:
-                        all_offers = offers
-                        fetched = True
+                offers = await self._fetch_results(
+                    request_id, country_id, is_strict_hotel_search, hotel_ids,
+                    onpage=onpage  # Передаём глубину выборки
+                )
+                if offers:
+                    all_offers = offers
+                    fetched = True
+                    logger.info(f"   ✅ Получено {len(offers)} туров (progress={status.progress}%, onpage={onpage})")
             
-            # Если завершено — выходим
+            # Если завершено — делаем финальный fetch и выходим
             if status.state == "finished":
+                # Финальный fetch чтобы получить все результаты
+                final_offers = await self._fetch_results(
+                    request_id, country_id, is_strict_hotel_search, hotel_ids,
+                    onpage=onpage  # Передаём глубину выборки
+                )
+                if final_offers:
+                    all_offers = final_offers
+                    fetched = True
+                logger.info(f"   🏁 Поиск завершён: {len(all_offers)} туров за {elapsed:.1f}s")
                 break
         
         if not fetched:
@@ -1047,17 +1416,30 @@ class TourvisorService:
         request_id: str,
         country_id: int,
         is_strict_hotel_search: bool,
-        hotel_ids: Optional[list[int]]
+        hotel_ids: Optional[list[int]],
+        page: int = 1,
+        onpage: int = 100  # CRITICAL: 100 для глубокой выборки (Source 216)
     ) -> list[TourOffer]:
         """
-        Получение результатов поиска.
+        Получение результатов поиска с поддержкой пагинации.
         
-        Метод: result.php?type=result&requestid=XXX
+        Метод: result.php?type=result&requestid=XXX&page=N&onpage=M
+        Согласно "1. Поиск туров.docx", Source 216
+        
+        Args:
+            request_id: ID поискового запроса
+            country_id: ID страны
+            is_strict_hotel_search: Строгий поиск по отелю
+            hotel_ids: Список ID отелей
+            page: Номер страницы (начиная с 1)
+            onpage: Количество отелей на странице (100 для глубокой выборки)
         """
         try:
             response = await self._request("result.php", {
                 "type": "result",
-                "requestid": request_id
+                "requestid": request_id,
+                "page": page,
+                "onpage": onpage
             })
             
             return self._parse_tour_results(
@@ -1066,6 +1448,91 @@ class TourvisorService:
         except Exception as e:
             logger.error(f"❌ Ошибка получения результатов: {e}")
             return []
+    
+    async def fetch_more_results(
+        self,
+        request_id: str,
+        country_id: int,
+        page: int = 2,
+        onpage: int = 100  # Глубокая выборка
+    ) -> list[TourOffer]:
+        """
+        Получение дополнительных результатов (пагинация).
+        
+        Используется для кнопки "Ещё туры".
+        
+        Args:
+            request_id: ID поискового запроса (сохранённый ранее)
+            country_id: ID страны
+            page: Номер страницы (2, 3, 4...)
+            onpage: Количество отелей на странице (100 для глубокой выборки)
+            
+        Returns:
+            Список дополнительных туров
+        """
+        logger.info(f"📄 Загрузка страницы {page} результатов...")
+        
+        return await self._fetch_results(
+            request_id=request_id,
+            country_id=country_id,
+            is_strict_hotel_search=False,
+            hotel_ids=None,
+            page=page,
+            onpage=onpage
+        )
+    
+    async def continue_search(
+        self,
+        request_id: str,
+        country_id: int
+    ) -> tuple[list[TourOffer], bool]:
+        """
+        Продолжение поиска для получения более полных результатов.
+        
+        GAP Analysis: Реализация continue для углублённого поиска.
+        
+        Согласно документации Tourvisor API:
+        - После первичного поиска можно вызвать search.php?continue=requestid
+        - Это продолжит опрос туроператоров для получения большего количества туров
+        
+        Args:
+            request_id: ID предыдущего поискового запроса
+            country_id: ID страны
+            
+        Returns:
+            Tuple (список туров, есть ли ещё результаты)
+        """
+        logger.info(f"🔄 Продолжение поиска: {request_id}")
+        
+        try:
+            # Запрос на продолжение поиска
+            response = await self._request("search.php", {
+                "continue": request_id
+            })
+            
+            # Получаем новый requestid или используем старый
+            new_request_id = response.get("result", {}).get("requestid", request_id)
+            
+            # Ждём дополнительные результаты (глубокая выборка)
+            offers = await self._poll_and_fetch_results(
+                request_id=new_request_id,
+                country_id=country_id,
+                is_strict_hotel_search=False,
+                hotel_ids=None,
+                onpage=100  # Глубокая выборка
+            )
+            
+            # Сортируем и берём СТРОГО 5 туров (лимит Pydantic!)
+            offers = sorted(offers, key=lambda x: x.price)[:5]
+            
+            # Проверяем, есть ли ещё данные
+            has_more = len(offers) >= 5
+            
+            return offers, has_more
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка продолжения поиска: {e}")
+            return [], False
     
     def _extract_request_id(self, response: dict) -> Optional[str]:
         """Извлечение requestid из ответа search.php."""
@@ -1149,8 +1616,11 @@ class TourvisorService:
         except ValueError:
             food_type = FoodType.AI
         
+        # === GAP Analysis: Извлекаем tour_id для бронирования ===
+        tour_id = tour.get("tourid") or tour.get("tour_id") or tour.get("id")
+        
         return TourOffer(
-            id=str(tour.get("tourid", uuid.uuid4())),
+            id=str(tour_id if tour_id else uuid.uuid4()),
             hotel_name=hotel.get("hotelname", "Unknown"),
             hotel_stars=int(hotel.get("hotelstars", 0)),
             hotel_rating=float(hotel.get("hotelrating")) if hotel.get("hotelrating") else None,
@@ -1170,6 +1640,7 @@ class TourvisorService:
             operator=tour.get("operatorname", ""),
             hotel_link=hotel.get("fulldesclink", ""),
             hotel_photo=hotel.get("picturelink", ""),
+            tour_id=str(tour_id) if tour_id else None,  # GAP Analysis: для booking_url
         )
     
     def _parse_date(self, date_str: Optional[str]) -> Optional[date]:

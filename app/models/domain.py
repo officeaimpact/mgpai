@@ -160,6 +160,26 @@ class SearchRequest(BaseModel):
         default="Москва",
         description="Город вылета"
     )
+    
+    # Услуги отелей (ID для параметра services)
+    services: Optional[list[int]] = Field(
+        default=None,
+        description="Список ID услуг отеля (песчаный пляж, аквапарк, 1-я линия)"
+    )
+    
+    # Типы отелей (для параметра hoteltypes)
+    hotel_types: Optional[list[str]] = Field(
+        default=None,
+        description="Типы отелей: family, beach, deluxe, active, relax, health, city"
+    )
+    
+    # Тип тура (для параметра tourtype)
+    tour_type: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=3,
+        description="Тип тура: 0=любой, 1=пляжный, 2=горнолыжный, 3=экскурсионный"
+    )
 
     @field_validator("children")
     @classmethod
@@ -176,17 +196,22 @@ class SearchRequest(BaseModel):
     def calculate_nights_and_validate(self) -> "SearchRequest":
         """
         Пост-валидация:
-        1. Автоматический расчёт ночей из дат
+        1. Проверка дат (date_to >= date_from для диапазона вылета)
         2. Игнорирование stars если указан hotel_name
+        
+        ВАЖНО: НЕ вычисляем nights из дат!
+        date_from/date_to — это диапазон дат ВЫЛЕТА (для flex search)
+        nights — это количество ночей тура (передаётся отдельно)
         """
-        # Автоматический расчёт количества ночей
+        # Проверка диапазона дат вылета
         if self.date_from and self.date_to:
-            calculated_nights = (self.date_to - self.date_from).days
-            if calculated_nights <= 0:
-                raise ValueError("date_to должна быть позже date_from")
-            # Устанавливаем nights если не указано вручную
-            if self.nights is None:
-                object.__setattr__(self, "nights", calculated_nights)
+            # date_to может быть равен date_from при точной дате (flex_days=0)
+            if self.date_to < self.date_from:
+                raise ValueError("date_to не может быть раньше date_from")
+        
+        # НЕ вычисляем nights из дат — nights передаётся явно!
+        # Это критически важно: date_from/date_to — диапазон вылета,
+        # а nights — длительность тура (разные вещи!)
         
         # Если указан конкретный отель, игнорируем stars
         if self.hotel_name is not None and self.stars is not None:
@@ -280,13 +305,22 @@ class TourOffer(BaseModel):
     # Туроператор
     operator: str = Field(description="Название туроператора")
     
-    # Туристы
-    adults: int = Field(default=2, ge=1, description="Количество взрослых")
-    children: int = Field(default=0, ge=0, description="Количество детей")
+    # === GAP Analysis: ID тура для бронирования ===
+    tour_id: Optional[str] = Field(
+        default=None,
+        description="ID тура в системе Tourvisor (для бронирования)"
+    )
     
-    # Изображение и ссылка
-    image: Optional[str] = Field(default=None, description="URL изображения отеля")
-    link: Optional[str] = Field(default=None, description="Ссылка на тур")
+    @property
+    def booking_url(self) -> Optional[str]:
+        """
+        URL для бронирования тура.
+        
+        GAP Analysis: Генерация booking_url с tourid для каждого TourOffer.
+        """
+        if self.tour_id:
+            return f"https://tourvisor.ru/book/?tourid={self.tour_id}"
+        return None
     
     @property
     def price_formatted(self) -> str:
@@ -318,9 +352,54 @@ class TourOffer(BaseModel):
         return meal_descriptions.get(self.food_type, self.food_type.value)
     
     @property
+    def date_start(self) -> str:
+        """Дата начала в формате DD.MM."""
+        return self.date_from.strftime("%d.%m")
+    
+    @property
+    def food_type_display(self) -> str:
+        """Тип питания для отображения."""
+        return self.meal_description
+    
+    @property
+    def stars(self) -> int:
+        """Псевдоним для hotel_stars."""
+        return self.hotel_stars
+    
+    @property
+    def price_value(self) -> int:
+        """Псевдоним для price."""
+        return self.price
+    
+    @property
     def stars_display(self) -> str:
         """Звёзды для отображения (★★★★★)."""
         return "★" * self.hotel_stars
+    
+    @property
+    def location(self) -> str:
+        """
+        Форматированная локация с приоритетом региона/курорта.
+        
+        Формат: {Region} ({Resort}), {Country}
+        Пример: Пхукет (пляж Карон), Таиланд
+        """
+        parts = []
+        
+        # Приоритет: регион первичен, потом курорт
+        if self.region:
+            parts.append(self.region)
+        if self.resort and self.resort != self.region:
+            if parts:
+                parts[0] = f"{parts[0]} ({self.resort})"
+            else:
+                parts.append(self.resort)
+        
+        # Страна всегда в конце
+        if self.country:
+            parts.append(self.country)
+        
+        return ", ".join(parts) if parts else self.country
     
     @property
     def image_url(self) -> str:
@@ -488,9 +567,13 @@ class SearchResponse(BaseModel):
     )
     reason: Optional[str] = Field(
         default=None,
-        description="Причина отсутствия: no_flights, no_season, filters_too_strict"
+        description="Причина отсутствия результатов: 'no_flights', 'no_season', 'filters_too_strict'"
     )
     suggestion: Optional[str] = Field(
         default=None,
-        description="Рекомендация: try_changing_dates, try_moscow_departure"
+        description="Рекомендация: 'try_changing_dates', 'try_moscow_departure', 'try_other_country'"
+    )
+    alternative_meal: bool = Field(
+        default=False,
+        description="True если найдены туры с другим типом питания (не запрошенным)"
     )
