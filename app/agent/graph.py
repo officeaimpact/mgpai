@@ -45,6 +45,8 @@ from app.agent.nodes import (
     clean_response_text  # GREETING CLEANER
 )
 from app.core.session import session_manager, apply_window_buffer, MAX_MESSAGES_HISTORY
+from app.core.debug_logger import debug_logger
+from app.services.tourvisor import set_trace_context
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
@@ -219,6 +221,12 @@ async def process_message(
     state["response"] = ""
     state["error"] = None
     
+    # ==================== TRACE CONTEXT ====================
+    # Устанавливаем контекст для трассировки API вызовов
+    messages = state.get("messages", [])
+    turn_id = len([m for m in messages if m.get("role") == "user"])
+    set_trace_context(thread_id, turn_id)
+    
     # Запускаем граф
     result = await agent_graph.ainvoke(state, config=config)
     
@@ -243,6 +251,41 @@ async def process_message(
     session_manager.increment_message_count(thread_id)
     
     logger.info(f"✅ Ответ сформирован для thread_id={thread_id}")
+    
+    # ==================== DEBUG LOGGING ====================
+    # Логируем turn если DEBUG_LOGS=1
+    if debug_logger.enabled:
+        try:
+            # Вычисляем turn_id (количество пар сообщений)
+            messages = result.get("messages", [])
+            turn_id = len([m for m in messages if m.get("role") == "user"])
+            
+            # Извлекаем данные для логирования
+            search_params = result.get("search_params", {})
+            cascade_stage = result.get("cascade_stage", 1)
+            search_mode = result.get("search_mode", "package")
+            missing_info = result.get("missing_info", [])
+            intent = result.get("intent")
+            last_question = result.get("last_question")
+            
+            debug_logger.log_turn(
+                conversation_id=thread_id,
+                turn_id=turn_id,
+                user_text=user_message,
+                assistant_text=assistant_response,
+                search_mode=search_mode,
+                cascade_stage=cascade_stage,
+                search_params=search_params,
+                missing_params=missing_info,
+                detected_intent=intent,
+                last_question_type=last_question,
+                extra={
+                    "is_first_message": is_first_message,
+                    "tour_offers_count": len(result.get("tour_offers", []))
+                }
+            )
+        except Exception as e:
+            logger.warning(f"[DEBUG_LOGGER] Ошибка логирования turn: {e}")
     
     return assistant_response, result
 

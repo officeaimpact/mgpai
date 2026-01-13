@@ -75,6 +75,14 @@ leads.txt
 *.db
 *.sqlite3
 
+# ===== Debug Bundle (логи не коммитим) =====
+debug_bundle/LOGS/*.jsonl
+debug_bundle/CASES/*.json
+debug_bundle/API_TRACES/*.json
+!debug_bundle/LOGS/.gitkeep
+!debug_bundle/CASES/.gitkeep
+!debug_bundle/API_TRACES/.gitkeep
+
 # ===== Jupyter Notebooks =====
 .ipynb_checkpoints/
 
@@ -88,3 +96,11 @@ htmlcov/
 
 # ===== Cursor IDE =====
 .cursor/
+# audit/debug artifacts
+_export_for_audit/
+export_for_audit.zip
+debug_bundle/
+debug_bundle.zip
+logs_only.zip
+app.jsonl
+TRANSFER_CHECKLIST.md

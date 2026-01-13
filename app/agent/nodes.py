@@ -137,25 +137,24 @@ def detect_search_mode(text: str) -> str:
     """
     text_lower = text.lower()
     
-    # Режим "только отель" (без перелёта) — МАКСИМАЛЬНОЕ ПОКРЫТИЕ!
+    # P0 STABILIZATION: hotel_only режим — ТОЛЬКО по явному запросу!
+    # Убраны контекстные триггеры ("пансионат", "отдых в сочи" и т.д.)
+    # Оставлены только явные фразы "без перелёта", "только отель"
     hotel_only_triggers = [
-        # Явные фразы
-        "без перелет", "без перелёт", "без самолет", "без самолёт",
-        "только отель", "только гостиниц", "только проживание",
-        "отель без", "гостиница без",
-        # Типы размещения
-        "пансионат", "апартамент", "санатор", "база отдыха",
-        "хостел", "гостевой дом", "глэмпинг",
-        # Технические термины
-        "наземное обслуживание", "наземка", "ground service",
-        "без авиа", "без билет", "без перевозк",
-        # Контекстные (Россия)
-        "размещение в", "отдых в сочи", "отдых в крым",
+        # ТОЛЬКО явные фразы (P0: минимальный набор)
+        "без перелет", "без перелёт", 
+        "только отель", "только проживание",
+        "наземное обслуживание", "наземка",
+        # Английские варианты
+        "ground service", "hotel only",
     ]
     for trigger in hotel_only_triggers:
         if trigger in text_lower:
             logger.info(f"🔍 DETECTED SEARCH MODE: hotel_only (trigger: '{trigger}')")
-            return "hotel_only"
+            # P0: hotel_only отключён в MVP — возвращаем package
+            # return "hotel_only"
+            logger.warning(f"⚠️ P0: hotel_only режим отключён в MVP. Используем package.")
+            return "package"  # P0: всегда package
     
     # Режим "горящие туры"
     burning_triggers = [
@@ -473,13 +472,19 @@ def extract_entities_regex(text: str) -> dict:
         valid_dates = [d for d in dates_found if d >= date.today()]
         if valid_dates:
             entities["date_from"] = valid_dates[0]
-            # Помечаем, что дата ТОЧНАЯ (указан конкретный день)
-            entities["is_exact_date"] = True
             # === STRICT SLOT FILLING: дата ЯВНО подтверждена! ===
             entities["dates_confirmed"] = True
-        if len(dates_found) > 1:
-            entities["date_to"] = dates_found[-1]
-            entities["nights"] = (dates_found[-1] - dates_found[0]).days
+            
+            # P0 STABILIZATION: Определяем is_exact_date
+            if len(valid_dates) > 1 and valid_dates[-1] != valid_dates[0]:
+                # Это ДИАПАЗОН дат (10-17 июня) — НЕ точная дата!
+                entities["date_to"] = valid_dates[-1]
+                entities["nights"] = (valid_dates[-1] - valid_dates[0]).days
+                entities["is_exact_date"] = False  # P0: диапазон = не точная дата
+                logger.info(f"   📅 P0: Диапазон дат {valid_dates[0]} - {valid_dates[-1]} (is_exact_date=False)")
+            else:
+                # Одна конкретная дата — точная дата
+                entities["is_exact_date"] = True
     
     # 5. Количество ночей
     # КРИТИЧНО: Валидация — nights не может быть > 21 без ЯВНОГО запроса!
@@ -1242,28 +1247,16 @@ async def input_analyzer(state: AgentState) -> AgentState:
             return state
     
     # ==================== SOCHI-TO-SOCHI DETECTION ====================
-    # Если город вылета = город назначения — переключаем в hotel_only режим
-    departure_city = merged_params.get("departure_city", "").lower().strip() if merged_params.get("departure_city") else ""
-    dest_region = merged_params.get("destination_region", "").lower().strip() if merged_params.get("destination_region") else ""
-    dest_resort = merged_params.get("destination_resort", "").lower().strip() if merged_params.get("destination_resort") else ""
-    dest_country = merged_params.get("destination_country", "").lower().strip() if merged_params.get("destination_country") else ""
-    
-    if departure_city:
-        # Проверяем совпадение по региону, курорту или стране (для внутренних поездок)
-        is_local_travel = (
-            (dest_region and departure_city in dest_region) or
-            (dest_resort and departure_city in dest_resort) or
-            (departure_city in dest_region if dest_region else False) or
-            (departure_city in dest_resort if dest_resort else False) or
-            # Точное совпадение (например, Сочи → Сочи)
-            departure_city == dest_region or
-            departure_city == dest_resort
-        )
-        
-        if is_local_travel:
-            logger.info(f"   🚗 LOCAL TRAVEL DETECTED: {departure_city} → {dest_region or dest_resort}. Switching to Hotel Only mode.")
-            state["search_mode"] = "hotel_only"
-            merged_params["departure_city"] = None  # Сбрасываем — не нужен для hotel_only
+    # P0 STABILIZATION: ОТКЛЮЧЕНО в MVP!
+    # Авто-переключение в hotel_only режим деактивировано.
+    # Если пользователь хочет "только отель", он должен написать это явно.
+    # 
+    # departure_city = merged_params.get("departure_city", "").lower().strip() if merged_params.get("departure_city") else ""
+    # dest_region = merged_params.get("destination_region", "").lower().strip() if merged_params.get("destination_region") else ""
+    # ... (логика закомментирована)
+    #
+    # TODO: Вернуть после стабилизации MVP с флагом ENABLE_AUTO_HOTEL_ONLY=true
+    pass  # P0: hotel_only авто-детекция отключена
     
     # ==================== ЕСЛИ УКАЗАН ОТЕЛЬ — ПРОПУСКАЕМ ЗВЁЗДНОСТЬ ====================
     if merged_params.get("hotel_name"):

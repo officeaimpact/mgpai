@@ -223,8 +223,9 @@ def get_cascade_stage(params: PartialSearchParams, search_mode: str = "package")
     КРИТИЧНО: Не запускаем поиск без adults и nights!
     """
     # Этап 1: нет страны
-    # ИСКЛЮЧЕНИЕ: Если указан конкретный отель — страна будет определена из поиска отеля
-    if not params.get("destination_country") and not params.get("hotel_name"):
+    # P0 STABILIZATION: Страна ОБЯЗАТЕЛЬНА даже при указании hotel_name!
+    # Без страны нельзя искать отель в справочнике Tourvisor.
+    if not params.get("destination_country"):
         return 1
     
     # Этап 2: нужен город вылета (ТОЛЬКО для package и burning!)
@@ -247,8 +248,22 @@ def get_cascade_stage(params: PartialSearchParams, search_mode: str = "package")
     adults = params.get("adults")
     nights = params.get("nights")
     
-    # Если adults не указан ЯВНО или nights не указан — спрашиваем
-    if not adults or not adults_explicit or not nights:
+    # P0 STABILIZATION: Если есть date_from И date_to — nights вычисляется автоматически!
+    date_from = params.get("date_from")
+    date_to = params.get("date_to")
+    
+    # Проверяем: можно ли вычислить nights из дат?
+    nights_can_be_calculated = (
+        date_from and date_to and 
+        date_to != date_from  # Это диапазон, не одна дата
+    )
+    
+    # Если adults не указан ЯВНО — спрашиваем
+    if not adults or not adults_explicit:
+        return 4
+    
+    # nights обязателен ТОЛЬКО если НЕТ date_to (или date_to == date_from)
+    if not nights and not nights_can_be_calculated:
         return 4
     
     # Этап 5: для массовых направлений нужны детали
@@ -266,18 +281,39 @@ def get_cascade_stage(params: PartialSearchParams, search_mode: str = "package")
     return 6
 
 
-def get_missing_required_params(params: PartialSearchParams) -> list[str]:
-    """Определяет недостающие обязательные параметры."""
+def get_missing_required_params(params: PartialSearchParams, search_mode: str = "package") -> list[str]:
+    """
+    Определяет недостающие обязательные параметры.
+    
+    P0 STABILIZATION:
+    - departure_city обязателен для package/burning (не для hotel_only)
+    - nights НЕ обязателен если есть date_from + date_to
+    """
     missing = []
     
+    # Страна — всегда обязательна (даже при hotel_name!)
     if not params.get("destination_country"):
         missing.append("destination_country")
-    if not params.get("departure_city"):
+    
+    # Город вылета — обязателен для package/burning
+    if search_mode != "hotel_only" and not params.get("departure_city"):
         missing.append("departure_city")
+    
+    # Дата начала — обязательна
     if not params.get("date_from"):
         missing.append("date_from")
+    
+    # Взрослые — обязательны
     if not params.get("adults"):
         missing.append("adults")
+    
+    # nights — НЕ обязателен если есть date_from + date_to (диапазон)
+    date_from = params.get("date_from")
+    date_to = params.get("date_to")
+    nights = params.get("nights")
+    
+    if not nights and not (date_from and date_to and date_to != date_from):
+        missing.append("nights")
     
     return missing
 

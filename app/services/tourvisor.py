@@ -55,6 +55,26 @@ except ImportError:
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
+# Debug Logger для трассировки API вызовов
+from app.core.debug_logger import debug_logger
+import time
+import contextvars
+
+# Контекстные переменные для передачи conversation_id и turn_id
+_conversation_id_var: contextvars.ContextVar[str] = contextvars.ContextVar('conversation_id', default='')
+_turn_id_var: contextvars.ContextVar[int] = contextvars.ContextVar('turn_id', default=0)
+
+
+def set_trace_context(conversation_id: str, turn_id: int) -> None:
+    """Установка контекста для трассировки API вызовов."""
+    _conversation_id_var.set(conversation_id)
+    _turn_id_var.set(turn_id)
+
+
+def get_trace_context() -> tuple[str, int]:
+    """Получение контекста трассировки."""
+    return _conversation_id_var.get(), _turn_id_var.get()
+
 
 # ==================== ENUMS & CONSTANTS ====================
 
@@ -221,6 +241,7 @@ class TourvisorService:
         Выполнение запроса к Tourvisor API.
         
         Автоматически добавляет авторизацию (authlogin, authpass) и format=json.
+        Логирует вызов в debug_bundle/LOGS/app.jsonl если DEBUG_LOGS=1.
         """
         client = await self._get_client()
         
@@ -236,13 +257,23 @@ class TourvisorService:
         logger.debug(f"📡 API Request: {endpoint}")
         logger.debug(f"   Params: {params}")
         
+        # Замеряем время выполнения
+        start_time = time.time()
+        status_code = None
+        error_msg = None
+        response_summary = None
+        result_count = None
+        
         try:
             response = await client.get(url, params=params)
+            status_code = response.status_code
             
             if response.status_code == 401:
+                error_msg = "Unauthorized"
                 raise TourvisorAPIError("Unauthorized", "Ошибка авторизации в API туров.")
             
             if response.status_code != 200:
+                error_msg = f"HTTP {response.status_code}"
                 raise TourvisorAPIError(f"HTTP {response.status_code}")
             
             # Очистка BOM и парсинг JSON
@@ -251,16 +282,133 @@ class TourvisorService:
                 text = text[1:]
             
             if not text or text == "{}":
+                response_summary = "Empty response"
                 return {}
             
-            return response.json()
+            result = response.json()
+            
+            # Формируем summary для логирования
+            response_summary = self._create_response_summary(endpoint, result)
+            result_count = self._extract_result_count(endpoint, result)
+            
+            return result
             
         except httpx.HTTPError as e:
             logger.error(f"❌ HTTP Error: {e}")
+            error_msg = str(e)
             raise TourvisorAPIError(str(e))
+        except TourvisorAPIError:
+            raise
         except Exception as e:
             logger.error(f"❌ Request Error: {e}")
+            error_msg = str(e)
             raise TourvisorAPIError(str(e))
+        finally:
+            # Логируем API trace если включено
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._log_api_trace(
+                endpoint=endpoint,
+                params=params,
+                status_code=status_code,
+                elapsed_ms=elapsed_ms,
+                result_count=result_count,
+                error=error_msg,
+                response_summary=response_summary
+            )
+    
+    def _create_response_summary(self, endpoint: str, result: dict) -> str:
+        """Создание краткого summary ответа API (без полного raw)."""
+        if not result:
+            return "Empty"
+        
+        if endpoint == "search.php":
+            request_id = result.get("result", {}).get("requestid")
+            return f"requestid={request_id}" if request_id else "No requestid"
+        
+        elif endpoint == "result.php":
+            status = result.get("data", {}).get("status", {})
+            progress = status.get("progress", 0) if isinstance(status, dict) else 0
+            tours_data = result.get("data", {}).get("result", {}).get("hotel", [])
+            count = len(tours_data) if isinstance(tours_data, list) else 0
+            return f"progress={progress}%, hotels={count}"
+        
+        elif endpoint == "hottours.php":
+            tours = result.get("hottours", {}).get("tour", [])
+            count = len(tours) if isinstance(tours, list) else 0
+            return f"hottours={count}"
+        
+        elif endpoint == "list.php":
+            # Справочники
+            keys = list(result.keys())[:3]
+            return f"lists: {keys}"
+        
+        elif endpoint in ("actualize.php", "actdetail.php"):
+            actualize = result.get("actualize", {})
+            price = actualize.get("price")
+            return f"price={price}" if price else "No price"
+        
+        elif endpoint == "hotel.php":
+            hotel = result.get("hotel", {})
+            name = hotel.get("name", "")[:30]
+            return f"hotel={name}" if name else "No hotel data"
+        
+        else:
+            # Общий случай
+            keys = list(result.keys())[:5]
+            return f"keys={keys}"
+    
+    def _extract_result_count(self, endpoint: str, result: dict) -> Optional[int]:
+        """Извлечение количества результатов из ответа API."""
+        if endpoint == "result.php":
+            tours = result.get("data", {}).get("result", {}).get("hotel", [])
+            return len(tours) if isinstance(tours, list) else None
+        
+        elif endpoint == "hottours.php":
+            tours = result.get("hottours", {}).get("tour", [])
+            return len(tours) if isinstance(tours, list) else None
+        
+        elif endpoint == "list.php":
+            # Пробуем найти списки
+            for key in ["countries", "departures", "hotels", "regions"]:
+                data = result.get("lists", {}).get(key, {})
+                if isinstance(data, dict):
+                    items = data.get(key[:-1], [])  # countries -> country
+                    if isinstance(items, list):
+                        return len(items)
+            return None
+        
+        return None
+    
+    def _log_api_trace(
+        self,
+        endpoint: str,
+        params: dict,
+        status_code: Optional[int],
+        elapsed_ms: float,
+        result_count: Optional[int],
+        error: Optional[str],
+        response_summary: Optional[str]
+    ) -> None:
+        """Логирование API trace в debug_bundle."""
+        if not debug_logger.enabled:
+            return
+        
+        try:
+            conversation_id, turn_id = get_trace_context()
+            
+            debug_logger.log_api_trace(
+                conversation_id=conversation_id or "unknown",
+                turn_id=turn_id,
+                endpoint=endpoint,
+                request_params=params,  # Будет санитизирован внутри log_api_trace
+                status_code=status_code,
+                elapsed_ms=elapsed_ms,
+                result_count=result_count,
+                error=error,
+                response_summary=response_summary
+            )
+        except Exception as e:
+            logger.warning(f"[DEBUG_LOGGER] Ошибка логирования API trace: {e}")
     
     # ==================== 1. СПРАВОЧНИКИ (list.php) ====================
     
@@ -1170,58 +1318,50 @@ class TourvisorService:
         
         КРИТИЧНО: Даты уже расширены в nodes.py — просто используем их!
         """
-        # ==================== NO DEFAULTS: nights должен быть указан! ====================
-        if not params.nights:
-            logger.error("❌ КРИТИЧЕСКАЯ ОШИБКА: nights не указан!")
-            nights_from = 7
-        else:
+        # ==================== P0 STABILIZATION: NIGHTS & DATES ====================
+        date_start = params.date_from
+        date_end = params.date_to or params.date_from
+        
+        # P0: Если есть date_from и date_to (диапазон), вычисляем nights автоматически
+        if params.date_to and params.date_to != params.date_from:
+            # Это диапазон дат — вычисляем nights из разницы
+            calculated_nights = (params.date_to - params.date_from).days
+            nights_from = calculated_nights if calculated_nights > 0 else 7
+            logger.info(f"   📅 P0: Диапазон дат {date_start.strftime('%d.%m')} - {date_end.strftime('%d.%m')}, nights={nights_from} (вычислено)")
+        elif params.nights:
             nights_from = params.nights
+            logger.info(f"   📅 Даты: {date_start.strftime('%d.%m')} - {date_end.strftime('%d.%m')}, nights={nights_from} (указано)")
+        else:
+            logger.error("❌ P0 ERROR: nights не указан и нет диапазона дат!")
+            nights_from = 7  # Fallback
         
         # Расширенный диапазон ночей: +2 ночи для гибкости
         nights_to = nights_from + 2
         
-        # ==================== ДАТЫ УЖЕ РАСШИРЕНЫ В NODES.PY ====================
-        # НЕ делаем дополнительных расширений — используем то, что пришло
-        date_start = params.date_from
-        date_end = params.date_to or params.date_from
-        
-        logger.info(f"   📅 Даты из nodes.py: {date_start.strftime('%d.%m')} - {date_end.strftime('%d.%m')}")
-        
-        # ==================== DEPARTURE: ЖЕЛЕЗОБЕТОННАЯ ЛОГИКА ====================
-        # 1. Проверяем явный флаг search_mode из params
+        # ==================== DEPARTURE: P0 STABILIZATION ====================
+        # departure=0 ставится ТОЛЬКО для hotel_only режима!
+        # Для package/burning отсутствие departure — ошибка каскада.
         mode = getattr(params, "search_mode", "package")
         
-        RUSSIA_COUNTRY_ID = 30  # ID России в Tourvisor
+        # P0 STABILIZATION: departure=0 ТОЛЬКО для hotel_only режима!
+        # Для package/burning отсутствие departure — это ошибка каскада (должен был спросить).
         
-        # Проверяем: город вылета совпадает с назначением?
-        departure_city = params.departure_city.lower() if params.departure_city else ""
-        destination_city = ""
-        if params.destination:
-            destination_city = (params.destination.city or params.destination.resort or "").lower()
-        
-        is_same_city = departure_city and destination_city and (
-            departure_city in destination_city or destination_city in departure_city
-        )
-        
-        # Определяем нужен ли перелёт
-        is_russia = (country_id == RUSSIA_COUNTRY_ID)
         is_hotel_only = (mode == "hotel_only")
-        no_departure = not departure_id
         
-        # 2. ПРИНУДИТЕЛЬНО departure=0 если:
-        #    - Режим hotel_only
-        #    - Город вылета совпадает с назначением (Сочи -> Сочи)
-        #    - Нет departure_id
-        if is_hotel_only or is_same_city or no_departure:
+        # departure=0 ставится ТОЛЬКО для hotel_only
+        if is_hotel_only:
             final_departure_id = 0
-            logger.info(f"   🚗 FORCE GROUND SERVICE: departure=0 (mode={mode}, hotel_only={is_hotel_only}, same_city={is_same_city})")
-        elif is_russia and not departure_id:
-            # Россия без явного города вылета — наземка
-            final_departure_id = 0
-            logger.info(f"   🇷🇺 РОССИЯ без вылета: departure=0")
-        else:
+            logger.info(f"   🚗 HOTEL_ONLY MODE: departure=0")
+        elif departure_id:
             final_departure_id = departure_id
             logger.info(f"   ✈️ ПЕРЕЛЁТ: departure={final_departure_id}")
+        else:
+            # P0: Для package/burning БЕЗ departure — это критическая ошибка!
+            # Каскад должен был спросить "Откуда вылетаете?"
+            logger.error(f"   ❌ P0 ERROR: mode={mode} без departure_id! Каскад не спросил город вылета.")
+            # Используем departure_id=0 как fallback, но логируем ошибку
+            final_departure_id = 0
+            logger.warning(f"   ⚠️ FALLBACK: departure=0 (но это ошибка каскада!)")
         
         api_params = {
             "departure": final_departure_id,
