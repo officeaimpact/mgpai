@@ -62,6 +62,16 @@ class PartialSearchParams(TypedDict, total=False):
     is_exact_date: bool         # Указана точная дата (не "в феврале")
     children_mentioned: bool    # Упомянуты дети (нужен возраст)
     children_count_mentioned: int  # Сколько детей упомянуто
+    
+    # === P1: EXPLICIT FILTER FLAGS ===
+    # Запрещаем неявные фильтры — добавлять только если явно указано пользователем!
+    stars_explicit: bool        # Звёзды указаны явно ("5 звёзд")
+    food_type_explicit: bool    # Питание указано явно ("всё включено")
+    hotel_name_explicit: bool   # Отель указан явно (не город/курорт)
+    
+    # === P1: DATE PRECISION ===
+    # Точность указания дат (для month-only проверки)
+    date_precision: str  # "exact" | "month" | "season" | None
 
 
 class Message(TypedDict):
@@ -129,6 +139,9 @@ class AgentState(TypedDict):
     # "hotel_only" — только отель (НЕ требует departure_city)
     # "burning" — горящие туры (гибкие даты)
     search_mode: str  # "package" | "hotel_only" | "burning"
+    
+    # === P1: API CALL TRACKING ===
+    api_call_made: bool  # Был ли фактический API вызов (для запрета "проверил" без API)
 
 
 # ==================== КАСКАД ВОПРОСОВ ====================
@@ -462,5 +475,7 @@ def create_initial_state() -> AgentState:
         current_page=1,
         has_more_results=False,
         # === SEARCH MODE (Strict Slot Filling) ===
-        search_mode="package"  # По умолчанию пакетный тур
+        search_mode="package",  # По умолчанию пакетный тур
+        # === P1: API CALL TRACKING ===
+        api_call_made=False,  # Был ли фактический API вызов
     )

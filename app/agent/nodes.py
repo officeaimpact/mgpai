@@ -443,7 +443,11 @@ def extract_entities_regex(text: str) -> dict:
         except ValueError:
             pass
     
-    # Месяц без даты — допускаем и с предлогом и без
+    # === P1: MONTH-ONLY DATES ===
+    # Месяц без даты — НЕ подтверждаем дату, спрашиваем уточнение!
+    is_month_only = False
+    detected_month = None
+    
     if not dates_found:
         month_patterns = [
             (r'(?:в|на|к)?\s*январ[еья]?', 1), (r'(?:в|на|к)?\s*феврал[еья]?', 2),
@@ -454,8 +458,18 @@ def extract_entities_regex(text: str) -> dict:
             (r'(?:в|на|к)?\s*ноябр[еья]?', 11), (r'(?:в|на|к)?\s*декабр[еья]?', 12),
         ]
         
+        # Также проверяем сезоны
+        season_patterns = [
+            (r'лет[оауе]м?', [6, 7, 8]),
+            (r'зим[оауе]й?', [12, 1, 2]),
+            (r'осень[юи]?', [9, 10, 11]),
+            (r'весн[оауе]й?', [3, 4, 5]),
+        ]
+        
         for pattern, month_num in month_patterns:
             if re.search(pattern, text_lower):
+                is_month_only = True
+                detected_month = month_num
                 year = date.today().year
                 try:
                     target = date(year, month_num, 1)
@@ -465,6 +479,22 @@ def extract_entities_regex(text: str) -> dict:
                 except ValueError:
                     pass
                 break
+        
+        # Сезоны — ещё более размытые
+        if not is_month_only:
+            for pattern, months in season_patterns:
+                if re.search(pattern, text_lower):
+                    is_month_only = True  # Сезон = month_only с точки зрения precision
+                    detected_month = months[1]  # Средний месяц сезона
+                    year = date.today().year
+                    try:
+                        target = date(year, months[1], 1)
+                        if target < date.today():
+                            target = date(year + 1, months[1], 1)
+                        dates_found.append(target)
+                    except ValueError:
+                        pass
+                    break
     
     if dates_found:
         dates_found.sort()
@@ -472,19 +502,28 @@ def extract_entities_regex(text: str) -> dict:
         valid_dates = [d for d in dates_found if d >= date.today()]
         if valid_dates:
             entities["date_from"] = valid_dates[0]
-            # === STRICT SLOT FILLING: дата ЯВНО подтверждена! ===
-            entities["dates_confirmed"] = True
             
-            # P0 STABILIZATION: Определяем is_exact_date
-            if len(valid_dates) > 1 and valid_dates[-1] != valid_dates[0]:
-                # Это ДИАПАЗОН дат (10-17 июня) — НЕ точная дата!
+            # === P1: MONTH-ONLY НЕ ПОДТВЕРЖДАЕТ ДАТУ! ===
+            if is_month_only:
+                # Месяц указан без числа — НЕ подтверждаем, спрашиваем уточнение
+                entities["dates_confirmed"] = False
+                entities["is_exact_date"] = False
+                entities["date_precision"] = "month"
+                entities["detected_month"] = detected_month
+                logger.info(f"   📅 P1: Месяц-only дата {valid_dates[0]}, date_precision=month (НЕ ПОДТВЕРЖДАЕМ!)")
+            elif len(valid_dates) > 1 and valid_dates[-1] != valid_dates[0]:
+                # Это ДИАПАЗОН дат (10-17 июня) — точная дата!
                 entities["date_to"] = valid_dates[-1]
                 entities["nights"] = (valid_dates[-1] - valid_dates[0]).days
-                entities["is_exact_date"] = False  # P0: диапазон = не точная дата
-                logger.info(f"   📅 P0: Диапазон дат {valid_dates[0]} - {valid_dates[-1]} (is_exact_date=False)")
+                entities["is_exact_date"] = True  # P1 FIX: диапазон — это точные даты!
+                entities["dates_confirmed"] = True
+                entities["date_precision"] = "exact"
+                logger.info(f"   📅 P1: Диапазон дат {valid_dates[0]} - {valid_dates[-1]} (dates_confirmed=True)")
             else:
                 # Одна конкретная дата — точная дата
                 entities["is_exact_date"] = True
+                entities["dates_confirmed"] = True
+                entities["date_precision"] = "exact"
     
     # 5. Количество ночей
     # КРИТИЧНО: Валидация — nights не может быть > 21 без ЯВНОГО запроса!
@@ -627,6 +666,7 @@ def extract_entities_regex(text: str) -> dict:
     for key, food_type in FOOD_TYPE_MAP.items():
         if key in text_lower:
             entities["food_type"] = food_type
+            entities["food_type_explicit"] = True  # P1: ЯВНО указано!
             entities["food_type_updated"] = True  # Флаг: обновлено в текущем шаге
             break
     
@@ -636,6 +676,7 @@ def extract_entities_regex(text: str) -> dict:
         stars = int(stars_match.group(1))
         if 3 <= stars <= 5:
             entities["stars"] = stars
+            entities["stars_explicit"] = True  # P1: ЯВНО указано!
             entities["stars_updated"] = True  # Флаг: обновлено в текущем шаге
     
     # 10. Название отеля (поиск по известным)
@@ -644,6 +685,7 @@ def extract_entities_regex(text: str) -> dict:
     for key, hotel_name in KNOWN_HOTELS.items():
         if key in text_lower:
             entities["hotel_name"] = hotel_name
+            entities["hotel_name_explicit"] = True  # P1: ЯВНО указано!
             # НЕ перезаписываем destination_country — оставляем как есть!
             break
     
@@ -1062,6 +1104,7 @@ async def input_analyzer(state: AgentState) -> AgentState:
         elif last_question == "stars" and 3 <= number <= 5:
             # "5" в ответ на "Какой уровень отеля?" → stars=5
             current_params["stars"] = number
+            current_params["stars_explicit"] = True  # P1: ЯВНО указано!
             current_params["skip_quality_check"] = True
             state["search_params"] = current_params
             state["last_question_type"] = None
@@ -1092,6 +1135,40 @@ async def input_analyzer(state: AgentState) -> AgentState:
             state["intent"] = "search_tour"
             state["cascade_stage"] = cascade_stage
             return state
+    
+    # === P1: НОРМАЛИЗАЦИЯ "неделя/на неделю" → nights=7 ===
+    user_text_lower = user_text.lower().strip()
+    week_patterns = ["неделю", "недельку", "неделя", "на неделю", "недели", "1 недел"]
+    
+    if last_question == "nights" and any(p in user_text_lower for p in week_patterns):
+        current_params = state["search_params"].copy() if state["search_params"] else {}
+        current_params["nights"] = 7
+        state["search_params"] = current_params
+        state["last_question_type"] = None
+        
+        missing = get_missing_required_params(current_params)
+        cascade_stage = get_cascade_stage(current_params, state.get("search_mode", "package"))
+        state["missing_info"] = missing
+        state["intent"] = "search_tour"
+        state["cascade_stage"] = cascade_stage
+        logger.info("   📅 P1: 'неделя' → nights=7")
+        return state
+    
+    # Также проверяем "две недели" / "2 недели"
+    two_weeks_patterns = ["две недел", "2 недел", "двух недел"]
+    if last_question == "nights" and any(p in user_text_lower for p in two_weeks_patterns):
+        current_params = state["search_params"].copy() if state["search_params"] else {}
+        current_params["nights"] = 14
+        state["search_params"] = current_params
+        state["last_question_type"] = None
+        
+        missing = get_missing_required_params(current_params)
+        cascade_stage = get_cascade_stage(current_params, state.get("search_mode", "package"))
+        state["missing_info"] = missing
+        state["intent"] = "search_tour"
+        state["cascade_stage"] = cascade_stage
+        logger.info("   📅 P1: '2 недели' → nights=14")
+        return state
     
     # ==================== ОБРАБОТКА ОТВЕТА НА CHILDREN_CHECK ====================
     # Если спрашивали "поедут ли дети?" и пользователь ответил "нет"/"без детей"
@@ -1473,15 +1550,58 @@ async def tour_searcher(state: AgentState) -> AgentState:
     """Поиск туров."""
     params = state["search_params"]
     
+    # ==================== P1: ГОРЯЩИЕ ТУРЫ ЧЕРЕЗ hottours.php ====================
+    # Для горящих туров используем ДРУГОЙ API endpoint — без обязательных дат/ночей!
+    is_hot_tours = state.get("intent") == "hot_tours" or params.get("is_hot_tour", False)
+    
+    if is_hot_tours:
+        logger.info("🔥 P1: Горящие туры — используем hottours.php")
+        
+        try:
+            # Загружаем справочники
+            await tourvisor_service.load_countries()
+            await tourvisor_service.load_departures()
+            
+            # Город вылета — если не указан, используем Москву (разумный дефолт для горящих)
+            departure_city = params.get("departure_city", "Москва")
+            departure_id = tourvisor_service.get_departure_id(departure_city) or 1
+            
+            # Страна — опциональна для горящих туров
+            country = params.get("destination_country")
+            country_id = None
+            if country:
+                country_id = tourvisor_service.get_country_id(country)
+            
+            logger.info(f"   🔥 Горящие: departure={departure_city}(id={departure_id}), country={country}(id={country_id})")
+            
+            # Вызов hottours.php
+            tours = await tourvisor_service.get_hot_tours(
+                departure_id=departure_id,
+                country_id=country_id,
+                limit=10  # P1: увеличиваем лимит для лучшего выбора
+            )
+            
+            state["tour_offers"] = tours
+            state["api_call_made"] = True  # P1: Отмечаем что API вызван
+            
+            if not tours:
+                # Нет горящих — предлагаем топ-направления
+                state["response"] = (
+                    "Сейчас нет горящих туров по вашим параметрам. "
+                    "Популярные направления: Турция, Египет, ОАЭ. "
+                    "Хотите посмотреть обычные туры в эти страны?"
+                )
+            
+            return state
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка поиска горящих туров: {e}")
+            state["error"] = str(e)
+            state["tour_offers"] = []
+            return state
+    
     # ==================== STRICT QUALIFICATION GUARDRAILS ====================
     # КРИТИЧНО: НЕ ЗАПУСКАЕМ ПОИСК без обязательных параметров!
-    
-    # ==================== ГОРЯЩИЕ ТУРЫ: ТОЖЕ БЕЗ ДЕФОЛТОВ! ====================
-    # Даже для горящих туров агент ОБЯЗАН спрашивать состав и длительность
-    is_hot_tours = state.get("intent") == "hot_tours"
-    
-    # НЕТ ДЕФОЛТОВ! Даже для горящих туров проверяем ВСЕ параметры.
-    if not is_hot_tours:
         # Для обычного поиска — СТРОГАЯ проверка
         
         # 1. Город вылета — ОБЯЗАТЕЛЬНО (кроме режима hotel_only!)
@@ -1587,16 +1707,26 @@ async def tour_searcher(state: AgentState) -> AgentState:
         else:
             logger.info(f"   ✈️ Город вылета: {departure_city}")
         
+        # === P1: ЗАПРЕТ НЕЯВНЫХ ФИЛЬТРОВ ===
+        # Добавляем stars/food_type/hotel_name ТОЛЬКО если явно указаны!
+        stars_for_search = params.get("stars") if params.get("stars_explicit") else None
+        food_type_for_search = params.get("food_type") if params.get("food_type_explicit") else None
+        hotel_name_for_search = params.get("hotel_name") if params.get("hotel_name_explicit") else None
+        
+        logger.info(f"   🔧 P1 Explicit filters: stars={stars_for_search} (explicit={params.get('stars_explicit')}), "
+                   f"food={food_type_for_search} (explicit={params.get('food_type_explicit')}), "
+                   f"hotel={hotel_name_for_search} (explicit={params.get('hotel_name_explicit')})")
+        
         search_request = SearchRequest(
             adults=params.get("adults"),  # Без дефолта! Проверено выше.
             children=params.get("children", []),
             destination=destination,
-            hotel_name=params.get("hotel_name"),
-            stars=params.get("stars"),
+            hotel_name=hotel_name_for_search,  # P1: только если explicit!
+            stars=stars_for_search,  # P1: только если explicit!
             date_from=date_from,
             date_to=date_to,
             nights=nights,  # КРИТИЧНО: передаём явно, не вычисляем из дат!
-            food_type=params.get("food_type"),
+            food_type=food_type_for_search,  # P1: только если explicit!
             departure_city=departure_city,  # СТРОГО без дефолта!
             # === НОВЫЕ ПАРАМЕТРЫ (GAP Analysis) ===
             services=params.get("services"),  # ID услуг отелей
@@ -1608,191 +1738,174 @@ async def tour_searcher(state: AgentState) -> AgentState:
         await tourvisor_service.load_countries()
         await tourvisor_service.load_departures()
         
-        if state["intent"] == "hot_tours":
-            # Горящие туры через hottours.php
-            departure_id = tourvisor_service.get_departure_id(
-                params.get("departure_city", "Москва")
-            ) or 1
-            country_id = tourvisor_service.get_country_id(destination.country)
-            
-            tours = await tourvisor_service.get_hot_tours(
-                departure_id=departure_id,
-                country_id=country_id,
-                limit=5
-            )
-            state["tour_offers"] = tours
-        else:
-            # ==================== СТРОГИЙ ПОИСК ПО ОТЕЛЮ ====================
-            # Если hotel_name указан — ОБЯЗАТЕЛЬНО ищем через find_hotel_by_name
-            hotel_name = params.get("hotel_name")
-            hotel_ids = None
-            is_strict = False
-            
-            # Сохраняем информацию о найденном отеле для Smart Alternatives
-            found_hotel_info = None
-            
-            if hotel_name:
-                # Ищем ID отеля в справочнике
-                country_for_hotel = params.get("destination_country")
-                hotels_found = await tourvisor_service.find_hotel_by_name(
-                    query=hotel_name,
-                    country=country_for_hotel
-                )
-                
-                if hotels_found:
-                    hotel_ids = [h.hotel_id for h in hotels_found[:3]]
-                    is_strict = True
-                    # Сохраняем инфо о первом отеле для Smart Alternatives
-                    found_hotel_info = hotels_found[0]
-                    state["found_hotel_name"] = found_hotel_info.name
-                    state["found_hotel_stars"] = found_hotel_info.stars
-                    # HotelInfo использует region_name, не region
-                    state["found_hotel_region"] = getattr(found_hotel_info, 'region_name', '') or getattr(found_hotel_info, 'resort_name', '')
-                else:
-                    # ==================== FAIL-FAST: ОТЕЛЬ НЕ НАЙДЕН В СПРАВОЧНИКЕ ====================
-                    state["tour_offers"] = []
-                    state["hotel_not_found"] = True
-                    state["response"] = (
-                        f"К сожалению, я не нашёл отель «{hotel_name}» в базе Tourvisor.\n\n"
-                        f"Уточните название или давайте посмотрим другие варианты в {country_for_hotel}."
-                    )
-                    return state
-            
-            # Определяем, горящий ли это тур
-            is_hot_tour_search = (
-                state.get("intent") == "hot_tours" or 
-                params.get("is_hot_tour", False)
+        # P1: hot_tours уже обработаны в начале функции, здесь только обычный поиск
+        
+        # ==================== СТРОГИЙ ПОИСК ПО ОТЕЛЮ ====================
+        # Если hotel_name указан — ОБЯЗАТЕЛЬНО ищем через find_hotel_by_name
+        hotel_name = params.get("hotel_name")
+        hotel_ids = None
+        is_strict = False
+        
+        # Сохраняем информацию о найденном отеле для Smart Alternatives
+        found_hotel_info = None
+        
+        if hotel_name:
+            # Ищем ID отеля в справочнике
+            country_for_hotel = params.get("destination_country")
+            hotels_found = await tourvisor_service.find_hotel_by_name(
+                query=hotel_name,
+                country=country_for_hotel
             )
             
-            # Обычный асинхронный поиск через search.php
-            result = await tourvisor_service.search_tours(
-                search_request,
-                is_strict_hotel_search=is_strict,
-                hotel_ids=hotel_ids,
-                is_hot_tour=is_hot_tour_search  # Расширенное окно для горящих!
-            )
-            
-            # ==================== SMART RETRY FOR ZERO RESULTS ====================
-            # Если strict date search вернул 0 результатов — автоматически расширяем диапазон
-            if is_exact_date and (not result.found or not result.offers) and not is_strict:
-                logger.info("   🔄 SMART RETRY: strict date вернул 0, расширяем до ±2 дней...")
-                
-                # Расширяем диапазон дат
-                expanded_date_from = original_date_from - timedelta(days=2)
-                expanded_date_to = original_date_from + timedelta(days=2)
-                
-                # Создаём новый запрос с расширенными датами
-                retry_request = SearchRequest(
-                    adults=search_request.adults,
-                    children=search_request.children,
-                    destination=search_request.destination,
-                    hotel_name=search_request.hotel_name,
-                    stars=search_request.stars,
-                    date_from=expanded_date_from,
-                    date_to=expanded_date_to,
-                    nights=search_request.nights,
-                    food_type=search_request.food_type,
-                    departure_city=search_request.departure_city,
-                    services=search_request.services,
-                    hotel_types=search_request.hotel_types,
-                    tour_type=search_request.tour_type,
-                )
-                
-                retry_result = await tourvisor_service.search_tours(
-                    retry_request,
-                    is_strict_hotel_search=is_strict,
-                    hotel_ids=hotel_ids,
-                    is_hot_tour=is_hot_tour_search
-                )
-                
-                if retry_result.found and retry_result.offers:
-                    result = retry_result
-                    state["date_warning"] = True  # Флаг для предупреждения в ответе
-                    logger.info(f"   ✅ SMART RETRY успешен: найдено {len(result.offers)} туров с ±2 дней")
-            
-            # ⛔ ОБРАБОТКА: Отель не найден в базе туроператоров
-            if result.reason == "hotel_not_found_in_db":
-                hotel_name = params.get("hotel_name", "указанный отель")
-                country = params.get("destination_country", "этом регионе")
+            if hotels_found:
+                hotel_ids = [h.hotel_id for h in hotels_found[:3]]
+                is_strict = True
+                # Сохраняем инфо о первом отеле для Smart Alternatives
+                found_hotel_info = hotels_found[0]
+                state["found_hotel_name"] = found_hotel_info.name
+                state["found_hotel_stars"] = found_hotel_info.stars
+                # HotelInfo использует region_name, не region
+                state["found_hotel_region"] = getattr(found_hotel_info, 'region_name', '') or getattr(found_hotel_info, 'resort_name', '')
+            else:
+                # ==================== FAIL-FAST: ОТЕЛЬ НЕ НАЙДЕН В СПРАВОЧНИКЕ ====================
                 state["tour_offers"] = []
                 state["hotel_not_found"] = True
                 state["response"] = (
-                    f"К сожалению, я не нашёл отель «{hotel_name}» в базе туроператоров в {country}.\n\n"
-                    f"Возможные причины:\n"
-                    f"• Отель не работает с туроператорами\n"
-                    f"• Отель закрыт на эти даты\n"
-                    f"• Название введено с ошибкой\n\n"
-                    f"Попробуйте уточнить название или посмотреть другие отели в {country}."
+                    f"К сожалению, я не нашёл отель «{hotel_name}» в базе Tourvisor.\n\n"
+                    f"Уточните название или давайте посмотрим другие варианты в {country_for_hotel}."
                 )
                 return state
+        
+        # P1: Обычный асинхронный поиск через search.php
+        result = await tourvisor_service.search_tours(
+            search_request,
+            is_strict_hotel_search=is_strict,
+            hotel_ids=hotel_ids
+        )
+        
+        # P1: Отмечаем что API вызван
+        state["api_call_made"] = True
+        
+        # ==================== SMART RETRY FOR ZERO RESULTS ====================
+        # Если strict date search вернул 0 результатов — автоматически расширяем диапазон
+        if is_exact_date and (not result.found or not result.offers) and not is_strict:
+            logger.info("   🔄 SMART RETRY: strict date вернул 0, расширяем до ±2 дней...")
             
-            # === СОХРАНЯЕМ ДАННЫЕ ДЛЯ ПАГИНАЦИИ (GAP Analysis) ===
-            if result.search_id:
-                state["last_search_id"] = result.search_id
-                state["last_country_id"] = tourvisor_service.get_country_id(destination.country)
-                state["current_page"] = 1
-                state["has_more_results"] = result.total_found > 5  # Есть ли ещё туры
+            # Расширяем диапазон дат
+            expanded_date_from = original_date_from - timedelta(days=2)
+            expanded_date_to = original_date_from + timedelta(days=2)
             
-            # ==================== SMART ALTERNATIVES ====================
-            # Если отель найден в справочнике, но туров нет — ищем альтернативы!
-            if is_strict and found_hotel_info and (not result.found or not result.offers):
-                # Туров в конкретный отель нет — ищем альтернативы
-                hotel_stars = found_hotel_info.stars or 5
-                # HotelInfo использует region_name, не region
-                hotel_region = getattr(found_hotel_info, 'region_name', '') or getattr(found_hotel_info, 'resort_name', '')
-                hotel_display_name = found_hotel_info.name
+            # Создаём новый запрос с расширенными датами
+            retry_request = SearchRequest(
+                adults=search_request.adults,
+                children=search_request.children,
+                destination=search_request.destination,
+                hotel_name=search_request.hotel_name,
+                stars=search_request.stars,
+                date_from=expanded_date_from,
+                date_to=expanded_date_to,
+                nights=search_request.nights,
+                food_type=search_request.food_type,
+                departure_city=search_request.departure_city,
+                services=search_request.services,
+                hotel_types=search_request.hotel_types,
+                tour_type=search_request.tour_type,
+            )
+            
+            retry_result = await tourvisor_service.search_tours(
+                retry_request,
+                is_strict_hotel_search=is_strict,
+                hotel_ids=hotel_ids
+            )
+            
+            if retry_result.found and retry_result.offers:
+                result = retry_result
+                state["date_warning"] = True  # Флаг для предупреждения в ответе
+                logger.info(f"   ✅ SMART RETRY успешен: найдено {len(result.offers)} туров с ±2 дней")
+        
+        # ⛔ ОБРАБОТКА: Отель не найден в базе туроператоров
+        if result.reason == "hotel_not_found_in_db":
+            hotel_name = params.get("hotel_name", "указанный отель")
+            country = params.get("destination_country", "этом регионе")
+            state["tour_offers"] = []
+            state["hotel_not_found"] = True
+            state["response"] = (
+                f"К сожалению, я не нашёл отель «{hotel_name}» в базе туроператоров в {country}.\n\n"
+                f"Возможные причины:\n"
+                f"• Отель не работает с туроператорами\n"
+                f"• Отель закрыт на эти даты\n"
+                f"• Название введено с ошибкой\n\n"
+                f"Попробуйте уточнить название или посмотреть другие отели в {country}."
+            )
+            return state
+        
+        # === СОХРАНЯЕМ ДАННЫЕ ДЛЯ ПАГИНАЦИИ (GAP Analysis) ===
+        if result.search_id:
+            state["last_search_id"] = result.search_id
+            state["last_country_id"] = tourvisor_service.get_country_id(destination.country)
+            state["current_page"] = 1
+            state["has_more_results"] = result.total_found > 5  # Есть ли ещё туры
+        
+        # ==================== SMART ALTERNATIVES ====================
+        # Если отель найден в справочнике, но туров нет — ищем альтернативы!
+        if is_strict and found_hotel_info and (not result.found or not result.offers):
+            # Туров в конкретный отель нет — ищем альтернативы
+            hotel_stars = found_hotel_info.stars or 5
+            # HotelInfo использует region_name, не region
+            hotel_region = getattr(found_hotel_info, 'region_name', '') or getattr(found_hotel_info, 'resort_name', '')
+            hotel_display_name = found_hotel_info.name
+            
+            # Создаём запрос для поиска альтернатив (по региону и звёздности)
+            alt_search_request = SearchRequest(
+                adults=params.get("adults"),  # Без дефолта!
+                children=params.get("children", []),
+                destination=Destination(
+                    country=params.get("destination_country"),
+                    region=hotel_region  # Тот же регион
+                ),
+                stars=hotel_stars,  # Те же звёзды
+                date_from=date_from,
+                date_to=date_to,
+                food_type=params.get("food_type"),
+                departure_city=params.get("departure_city", "Москва")
+            )
+            
+            # Поиск альтернатив (БЕЗ строгого фильтра по отелю)
+            alt_result = await tourvisor_service.search_tours(
+                alt_search_request,
+                is_strict_hotel_search=False,
+                hotel_ids=None
+            )
+            
+            if alt_result.found and alt_result.offers:
+                # Исключаем исходный отель из альтернатив
+                filtered_offers = [
+                    offer for offer in alt_result.offers
+                    if offer.hotel_name.lower() != hotel_display_name.lower()
+                ][:5]
                 
-                # Создаём запрос для поиска альтернатив (по региону и звёздности)
-                alt_search_request = SearchRequest(
-                    adults=params.get("adults"),  # Без дефолта!
-                    children=params.get("children", []),
-                    destination=Destination(
-                        country=params.get("destination_country"),
-                        region=hotel_region  # Тот же регион
-                    ),
-                    stars=hotel_stars,  # Те же звёзды
-                    date_from=date_from,
-                    date_to=date_to,
-                    food_type=params.get("food_type"),
-                    departure_city=params.get("departure_city", "Москва")
-                )
-                
-                # Поиск альтернатив (БЕЗ строгого фильтра по отелю)
-                alt_result = await tourvisor_service.search_tours(
-                    alt_search_request,
-                    is_strict_hotel_search=False,
-                    hotel_ids=None
-                )
-                
-                if alt_result.found and alt_result.offers:
-                    # Исключаем исходный отель из альтернатив
-                    filtered_offers = [
-                        offer for offer in alt_result.offers
-                        if offer.hotel_name.lower() != hotel_display_name.lower()
-                    ][:5]
-                    
-                    if filtered_offers:
-                        state["tour_offers"] = filtered_offers
-                        state["smart_alternatives"] = True
-                        state["original_hotel_name"] = hotel_display_name
-                        state["original_hotel_stars"] = hotel_stars
-                        state["original_hotel_region"] = hotel_region or country_for_hotel
-                    else:
-                        # Альтернатив тоже нет
-                        state["tour_offers"] = []
-                        state["no_alternatives"] = True
+                if filtered_offers:
+                    state["tour_offers"] = filtered_offers
+                    state["smart_alternatives"] = True
+                    state["original_hotel_name"] = hotel_display_name
+                    state["original_hotel_stars"] = hotel_stars
+                    state["original_hotel_region"] = hotel_region or country_for_hotel
                 else:
-                    # Альтернатив нет
+                    # Альтернатив тоже нет
                     state["tour_offers"] = []
                     state["no_alternatives"] = True
-                    state["search_reason"] = result.reason
-                    state["search_suggestion"] = result.suggestion
             else:
-                state["tour_offers"] = result.offers if result.found else []
-                
-                if not result.found:
-                    state["search_reason"] = result.reason
-                    state["search_suggestion"] = result.suggestion
+                # Альтернатив нет
+                state["tour_offers"] = []
+                state["no_alternatives"] = True
+                state["search_reason"] = result.reason
+                state["search_suggestion"] = result.suggestion
+        else:
+            state["tour_offers"] = result.offers if result.found else []
+            
+            if not result.found:
+                state["search_reason"] = result.reason
+                state["search_suggestion"] = result.suggestion
         
     except Exception as e:
         state["error"] = f"Ошибка поиска: {str(e)}"
@@ -1807,6 +1920,7 @@ def generate_no_results_explanation(params: PartialSearchParams, state: AgentSta
     Учитывает количество попыток для предотвращения зацикливания.
     
     GAP Analysis: Добавлен Smart Fallback по типу питания (AI -> HB).
+    P1: Запрет "проверил" без фактического API вызова.
     
     Returns:
         tuple: (текст ответа, нужно ли ждать согласия, тип предложенного действия)
@@ -1824,6 +1938,17 @@ def generate_no_results_explanation(params: PartialSearchParams, state: AgentSta
     offered_alt_departure = state.get("offered_alt_departure", False) if state else False
     offered_alt_food = state.get("offered_alt_food", False) if state else False
     offered_lower_stars = state.get("offered_lower_stars", False) if state else False
+    
+    # === P1: ЗАПРЕТ "проверил" БЕЗ ФАКТИЧЕСКОГО API ВЫЗОВА ===
+    api_call_made = state.get("api_call_made", False) if state else False
+    if not api_call_made:
+        # Нет API вызова — не можем говорить "проверил"
+        logger.warning("   ⚠️ P1: НЕТ api_call_made — не говорим 'проверил'")
+        return (
+            "Не удалось выполнить поиск. Пожалуйста, уточните параметры: даты, город вылета и направление.",
+            False,
+            None
+        )
     
     if date_from:
         date_str = date_from.strftime("%d.%m")
@@ -2033,6 +2158,21 @@ async def responder(state: AgentState) -> AgentState:
             else:
                 state["response"] = "На какие даты планируете вылет?"
             state["last_question_type"] = "dates"
+            return state
+        
+        # === P1: MONTH-ONLY DATES — спрашиваем конкретные числа ===
+        date_precision = params.get("date_precision")
+        if date_precision == "month" and not params.get("dates_confirmed"):
+            detected_month = params.get("detected_month")
+            month_names = {
+                1: "января", 2: "февраля", 3: "марта", 4: "апреля",
+                5: "мая", 6: "июня", 7: "июля", 8: "августа",
+                9: "сентября", 10: "октября", 11: "ноября", 12: "декабря"
+            }
+            month_name = month_names.get(detected_month, "месяца")
+            state["response"] = f"Какого числа {month_name} планируете вылет?"
+            state["last_question_type"] = "dates"
+            logger.info(f"   📅 P1: Month-only ({month_name}) — спрашиваем конкретную дату")
             return state
         
         # ==================== 3. ПРОВЕРКА НОЧЕЙ ====================

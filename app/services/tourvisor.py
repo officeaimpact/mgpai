@@ -1494,29 +1494,29 @@ class TourvisorService:
             if elapsed < self.min_wait_seconds:
                 continue
             
-            # Если достаточный прогресс — забираем результаты
-            if status.progress >= self.min_progress_to_fetch or status.state == "finished":
-                offers = await self._fetch_results(
-                    request_id, country_id, is_strict_hotel_search, hotel_ids,
-                    onpage=onpage  # Передаём глубину выборки
-                )
-                if offers:
-                    all_offers = offers
-                    fetched = True
-                    logger.info(f"   ✅ Получено {len(offers)} туров (progress={status.progress}%, onpage={onpage})")
-            
-            # Если завершено — делаем финальный fetch и выходим
+            # === P1: ИСПРАВЛЕНИЕ ДУБЛИРОВАНИЯ RESULT.PHP ===
+            # Если завершено — делаем ОДИН финальный fetch и выходим
             if status.state == "finished":
-                # Финальный fetch чтобы получить все результаты
                 final_offers = await self._fetch_results(
                     request_id, country_id, is_strict_hotel_search, hotel_ids,
-                    onpage=onpage  # Передаём глубину выборки
+                    onpage=onpage
                 )
                 if final_offers:
                     all_offers = final_offers
                     fetched = True
-                logger.info(f"   🏁 Поиск завершён: {len(all_offers)} туров за {elapsed:.1f}s")
+                logger.info(f"   🏁 P1: Поиск завершён: {len(all_offers)} туров за {elapsed:.1f}s (1 fetch)")
                 break
+            
+            # Промежуточные результаты — только если ещё не finished
+            if status.progress >= self.min_progress_to_fetch and not fetched:
+                offers = await self._fetch_results(
+                    request_id, country_id, is_strict_hotel_search, hotel_ids,
+                    onpage=onpage
+                )
+                if offers:
+                    all_offers = offers
+                    fetched = True
+                    logger.info(f"   ✅ Промежуточные результаты: {len(offers)} туров (progress={status.progress}%)")
         
         if not fetched:
             raise SearchTimeoutError("Search timeout")
