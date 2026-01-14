@@ -174,13 +174,14 @@ def detect_search_mode(text: str) -> str:
 
 
 FOOD_TYPE_MAP = {
+    # Ultra All Inclusive (ВАЖНО: проверять ПЕРЕД AI!)
+    "ультра всё включено": FoodType.UAI, "ультра все включено": FoodType.UAI,
+    "ultra all inclusive": FoodType.UAI, "uai": FoodType.UAI,
+    "ультра олл инклюзив": FoodType.UAI, "ultra ai": FoodType.UAI,
+    
     # All Inclusive
     "всё включено": FoodType.AI, "все включено": FoodType.AI, "всё вкл": FoodType.AI,
     "all inclusive": FoodType.AI, "ai": FoodType.AI, "олл инклюзив": FoodType.AI,
-    
-    # Ultra All Inclusive
-    "ультра всё включено": FoodType.UAI, "ультра все включено": FoodType.UAI,
-    "ультра": FoodType.UAI, "ultra": FoodType.UAI, "uai": FoodType.UAI,
     
     # Bed & Breakfast
     "завтрак": FoodType.BB, "завтраки": FoodType.BB, "только завтрак": FoodType.BB,
@@ -527,8 +528,22 @@ def extract_entities_regex(text: str) -> dict:
     
     # 5. Количество ночей
     # КРИТИЧНО: Валидация — nights не может быть > 21 без ЯВНОГО запроса!
+    
+    # P1 FIX: Сначала проверяем словесные выражения ("на неделю")
+    week_patterns_extract = [
+        r'на\s+недел[юеь]', r'недел[юьк]а?у?', r'неделя',  # "на неделю", "недельку"
+    ]
+    for wp in week_patterns_extract:
+        if re.search(wp, text_lower):
+            entities["nights"] = 7
+            if "date_from" in entities and "date_to" not in entities:
+                entities["date_to"] = entities["date_from"] + timedelta(days=7)
+            logger.info(f"   🌙 P1 FIX: Парсинг 'на неделю' → nights=7")
+            break
+    
+    # Потом проверяем числовые паттерны (если nights ещё не установлен)
     nights_match = re.search(r'(\d+)\s*(?:ноч|ночей|ночи|дней|дня|день)', text_lower)
-    if nights_match:
+    if nights_match and "nights" not in entities:
         nights = int(nights_match.group(1))
         # Разумный диапазон: 1-21 ночей (стандартные туры)
         # Более 21 ночи — только если явно запросили (например "30 ночей")
@@ -663,7 +678,10 @@ def extract_entities_regex(text: str) -> dict:
             entities["adults_explicit"] = True
     
     # 8. Тип питания
-    for key, food_type in FOOD_TYPE_MAP.items():
+    # P1 FIX: Проверяем UAI ПЕРЕД AI (иначе "ультра всё включено" даст AI)
+    # Сортируем по длине ключа (длинные = более специфичные = первые)
+    food_type_sorted = sorted(FOOD_TYPE_MAP.items(), key=lambda x: len(x[0]), reverse=True)
+    for key, food_type in food_type_sorted:
         if key in text_lower:
             entities["food_type"] = food_type
             entities["food_type_explicit"] = True  # P1: ЯВНО указано!
