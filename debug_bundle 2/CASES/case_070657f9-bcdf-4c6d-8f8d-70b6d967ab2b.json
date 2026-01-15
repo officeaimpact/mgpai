@@ -1,0 +1,294 @@
+{
+  "conversation_id": "070657f9-bcdf-4c6d-8f8d-70b6d967ab2b",
+  "exported_at": "2026-01-14T09:11:59.112585Z",
+  "summary": {
+    "total_turns": 8,
+    "total_errors": 0,
+    "first_message": "2026-01-14T08:55:22.725086Z",
+    "last_message": "2026-01-14T08:56:43.945234Z"
+  },
+  "messages": [
+    {
+      "turn_id": 1,
+      "user": "Найди горящие туры в Турцию, 2 взрослых, вылет Москва",
+      "assistant": "Когда планируете вылет?"
+    },
+    {
+      "turn_id": 2,
+      "user": "22 января",
+      "assistant": "На сколько ночей планируете поездку?"
+    },
+    {
+      "turn_id": 3,
+      "user": "6 ночей",
+      "assistant": "Какой уровень отеля — 5 звёзд всё включено или рассмотрим варианты?"
+    },
+    {
+      "turn_id": 4,
+      "user": "5 звезд все включено",
+      "assistant": "На 22.01 вылетов из Москва нет. Посмотреть соседние даты?"
+    },
+    {
+      "turn_id": 5,
+      "user": "да",
+      "assistant": "С питанием «Всё включено» вариантов нет.\nПосмотреть отели с «Полупансион» (HB: завтрак + ужин)?"
+    },
+    {
+      "turn_id": 6,
+      "user": "да",
+      "assistant": "Отелей 5⭐ на эти даты нет.\nПосмотреть 4⭐ отели?"
+    },
+    {
+      "turn_id": 7,
+      "user": "да",
+      "assistant": "Я проверил все варианты с 17.01 по 27.01.\nК сожалению, рейсов нет. Попробуйте сдвинуть отпуск на неделю или выбрать другое направление."
+    },
+    {
+      "turn_id": 8,
+      "user": "01.02",
+      "assistant": "На 01.02 вылетов из Москва нет. Посмотреть соседние даты?"
+    }
+  ],
+  "metadata_per_turn": [
+    {
+      "turn_id": 1,
+      "timestamp": "2026-01-14T08:55:22.725086Z",
+      "search_mode": "burning",
+      "cascade_stage": 3,
+      "search_params": {
+        "is_hot_tour": true,
+        "date_from": "2026-01-15",
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "adults": 2,
+        "adults_explicit": true
+      },
+      "missing_params": [
+        "nights"
+      ],
+      "detected_intent": "hot_tours",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": true,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 2,
+      "timestamp": "2026-01-14T08:55:38.607030Z",
+      "search_mode": "burning",
+      "cascade_stage": 4,
+      "search_params": {
+        "is_hot_tour": true,
+        "date_from": "2026-01-22",
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "adults": 2,
+        "adults_explicit": true,
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact"
+      },
+      "missing_params": [
+        "nights"
+      ],
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 3,
+      "timestamp": "2026-01-14T08:55:48.484894Z",
+      "search_mode": "burning",
+      "cascade_stage": 5,
+      "search_params": {
+        "is_hot_tour": true,
+        "date_from": "2026-01-22",
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "adults": 2,
+        "adults_explicit": true,
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "nights": 6,
+        "date_to": "2026-01-28"
+      },
+      "missing_params": null,
+      "detected_intent": "other",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 4,
+      "timestamp": "2026-01-14T08:55:56.140870Z",
+      "search_mode": "burning",
+      "cascade_stage": 6,
+      "search_params": {
+        "is_hot_tour": true,
+        "date_from": "2026-01-22",
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "adults": 2,
+        "adults_explicit": true,
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "nights": 6,
+        "date_to": "2026-01-28",
+        "food_type": "AI",
+        "food_type_explicit": true,
+        "food_type_updated": true,
+        "stars": 5,
+        "stars_explicit": true,
+        "stars_updated": true,
+        "skip_quality_check": true
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 5,
+      "timestamp": "2026-01-14T08:56:31.639604Z",
+      "search_mode": "burning",
+      "cascade_stage": 6,
+      "search_params": {
+        "is_hot_tour": true,
+        "date_from": "2026-01-22",
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "adults": 2,
+        "adults_explicit": true,
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "nights": 6,
+        "date_to": "2026-01-28",
+        "food_type": "AI",
+        "food_type_explicit": true,
+        "food_type_updated": true,
+        "stars": 5,
+        "stars_explicit": true,
+        "stars_updated": true,
+        "skip_quality_check": true
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 6,
+      "timestamp": "2026-01-14T08:56:33.544206Z",
+      "search_mode": "burning",
+      "cascade_stage": 6,
+      "search_params": {
+        "is_hot_tour": true,
+        "date_from": "2026-01-22",
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "adults": 2,
+        "adults_explicit": true,
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "nights": 6,
+        "date_to": "2026-01-28",
+        "food_type": "HB",
+        "food_type_explicit": true,
+        "food_type_updated": true,
+        "stars": 5,
+        "stars_explicit": true,
+        "stars_updated": true,
+        "skip_quality_check": true
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 7,
+      "timestamp": "2026-01-14T08:56:34.811302Z",
+      "search_mode": "burning",
+      "cascade_stage": 6,
+      "search_params": {
+        "is_hot_tour": true,
+        "date_from": "2026-01-22",
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "adults": 2,
+        "adults_explicit": true,
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "nights": 6,
+        "date_to": "2026-01-28",
+        "food_type": "HB",
+        "food_type_explicit": true,
+        "food_type_updated": true,
+        "stars": 4,
+        "stars_explicit": true,
+        "stars_updated": true,
+        "skip_quality_check": true
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 8,
+      "timestamp": "2026-01-14T08:56:43.945234Z",
+      "search_mode": "burning",
+      "cascade_stage": 6,
+      "search_params": {
+        "is_hot_tour": true,
+        "date_from": "2026-02-01",
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "adults": 2,
+        "adults_explicit": true,
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "nights": 6,
+        "date_to": "2026-01-28",
+        "food_type": "HB",
+        "food_type_explicit": true,
+        "food_type_updated": true,
+        "stars": 4,
+        "stars_explicit": true,
+        "stars_updated": true,
+        "skip_quality_check": true
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    }
+  ]
+}

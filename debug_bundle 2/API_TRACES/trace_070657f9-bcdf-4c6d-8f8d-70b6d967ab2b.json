@@ -1,0 +1,110 @@
+{
+  "conversation_id": "070657f9-bcdf-4c6d-8f8d-70b6d967ab2b",
+  "exported_at": "2026-01-14T09:11:59.113232Z",
+  "summary": {
+    "total_api_calls": 5,
+    "total_errors": 0,
+    "total_elapsed_ms": 758.31,
+    "avg_elapsed_ms": 151.66,
+    "endpoints": {
+      "hottours.php": 5
+    }
+  },
+  "traces": [
+    {
+      "type": "api_trace",
+      "conversation_id": "070657f9-bcdf-4c6d-8f8d-70b6d967ab2b",
+      "turn_id": 4,
+      "endpoint": "hottours.php",
+      "request_params": {
+        "city": 1,
+        "items": 10,
+        "country": 4,
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 171.52,
+      "result_count": 10,
+      "response_summary": "hottours=10",
+      "timestamp": "2026-01-14T08:55:56.136480Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "070657f9-bcdf-4c6d-8f8d-70b6d967ab2b",
+      "turn_id": 5,
+      "endpoint": "hottours.php",
+      "request_params": {
+        "city": 1,
+        "items": 10,
+        "country": 4,
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 185.97,
+      "result_count": 10,
+      "response_summary": "hottours=10",
+      "timestamp": "2026-01-14T08:56:31.633704Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "070657f9-bcdf-4c6d-8f8d-70b6d967ab2b",
+      "turn_id": 6,
+      "endpoint": "hottours.php",
+      "request_params": {
+        "city": 1,
+        "items": 10,
+        "country": 4,
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 109.8,
+      "result_count": 10,
+      "response_summary": "hottours=10",
+      "timestamp": "2026-01-14T08:56:33.539361Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "070657f9-bcdf-4c6d-8f8d-70b6d967ab2b",
+      "turn_id": 7,
+      "endpoint": "hottours.php",
+      "request_params": {
+        "city": 1,
+        "items": 10,
+        "country": 4,
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 130.07,
+      "result_count": 10,
+      "response_summary": "hottours=10",
+      "timestamp": "2026-01-14T08:56:34.807940Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "070657f9-bcdf-4c6d-8f8d-70b6d967ab2b",
+      "turn_id": 8,
+      "endpoint": "hottours.php",
+      "request_params": {
+        "city": 1,
+        "items": 10,
+        "country": 4,
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 160.95,
+      "result_count": 10,
+      "response_summary": "hottours=10",
+      "timestamp": "2026-01-14T08:56:43.940418Z"
+    }
+  ]
+}

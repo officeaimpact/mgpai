@@ -1,0 +1,40 @@
+{
+  "conversation_id": "4fc3ffbe-44f1-4b6f-b371-1daaf9a56e63",
+  "exported_at": "2026-01-14T09:11:59.102647Z",
+  "summary": {
+    "total_turns": 1,
+    "total_errors": 0,
+    "first_message": "2026-01-14T08:23:20.068364Z",
+    "last_message": "2026-01-14T08:23:20.068364Z"
+  },
+  "messages": [
+    {
+      "turn_id": 1,
+      "user": "турция",
+      "assistant": "Из какого города вылет?"
+    }
+  ],
+  "metadata_per_turn": [
+    {
+      "turn_id": 1,
+      "timestamp": "2026-01-14T08:23:20.068364Z",
+      "search_mode": "package",
+      "cascade_stage": 2,
+      "search_params": {
+        "destination_country": "Турция"
+      },
+      "missing_params": [
+        "departure_city",
+        "date_from",
+        "adults",
+        "nights"
+      ],
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": true,
+        "tour_offers_count": 0
+      }
+    }
+  ]
+}

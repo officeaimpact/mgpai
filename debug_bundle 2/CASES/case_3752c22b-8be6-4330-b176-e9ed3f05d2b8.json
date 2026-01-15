@@ -1,0 +1,145 @@
+{
+  "conversation_id": "3752c22b-8be6-4330-b176-e9ed3f05d2b8",
+  "exported_at": "2026-01-14T09:11:59.108908Z",
+  "summary": {
+    "total_turns": 4,
+    "total_errors": 0,
+    "first_message": "2026-01-14T08:47:23.857799Z",
+    "last_message": "2026-01-14T08:47:50.513318Z"
+  },
+  "messages": [
+    {
+      "turn_id": 1,
+      "user": "Египет, конец июня на 7–9 ночей, 2 взрослых, вылет из СПб",
+      "assistant": "Когда планируете вылет?"
+    },
+    {
+      "turn_id": 2,
+      "user": "17 числа",
+      "assistant": "Какой уровень отеля — 5 звёзд всё включено или рассмотрим варианты?"
+    },
+    {
+      "turn_id": 3,
+      "user": "да",
+      "assistant": "Произошла ошибка: Ошибка поиска: 1 validation error for SearchRequest\nnights\n  Input should be less than or equal to 30 [type=less_than_equal, input_value=144, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/less_than_equal. Попробуйте ещё раз."
+    },
+    {
+      "turn_id": 4,
+      "user": "5 звезд все включено",
+      "assistant": "Произошла ошибка: Ошибка поиска: 1 validation error for SearchRequest\nnights\n  Input should be less than or equal to 30 [type=less_than_equal, input_value=144, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/less_than_equal. Попробуйте ещё раз."
+    }
+  ],
+  "metadata_per_turn": [
+    {
+      "turn_id": 1,
+      "timestamp": "2026-01-14T08:47:23.857799Z",
+      "search_mode": "package",
+      "cascade_stage": 3,
+      "search_params": {
+        "destination_country": "Египет",
+        "departure_city": "СПб",
+        "date_from": "2026-06-01",
+        "dates_confirmed": false,
+        "is_exact_date": false,
+        "date_precision": "month",
+        "detected_month": 6,
+        "nights": 9,
+        "date_to": "2026-06-10",
+        "adults": 2,
+        "adults_explicit": true
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": true,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 2,
+      "timestamp": "2026-01-14T08:47:36.660429Z",
+      "search_mode": "package",
+      "cascade_stage": 5,
+      "search_params": {
+        "destination_country": "Египет",
+        "departure_city": "СПб",
+        "date_from": "2026-01-17",
+        "dates_confirmed": true,
+        "is_exact_date": false,
+        "date_precision": "month",
+        "detected_month": 6,
+        "nights": 144,
+        "date_to": "2026-06-10",
+        "adults": 2,
+        "adults_explicit": true
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 3,
+      "timestamp": "2026-01-14T08:47:39.717894Z",
+      "search_mode": "package",
+      "cascade_stage": 5,
+      "search_params": {
+        "destination_country": "Египет",
+        "departure_city": "СПб",
+        "date_from": "2026-01-17",
+        "dates_confirmed": true,
+        "is_exact_date": false,
+        "date_precision": "month",
+        "detected_month": 6,
+        "nights": 144,
+        "date_to": "2026-06-10",
+        "adults": 2,
+        "adults_explicit": true
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 4,
+      "timestamp": "2026-01-14T08:47:50.513318Z",
+      "search_mode": "package",
+      "cascade_stage": 6,
+      "search_params": {
+        "destination_country": "Египет",
+        "departure_city": "СПб",
+        "date_from": "2026-01-17",
+        "dates_confirmed": true,
+        "is_exact_date": false,
+        "date_precision": "month",
+        "detected_month": 6,
+        "nights": 144,
+        "date_to": "2026-06-10",
+        "adults": 2,
+        "adults_explicit": true,
+        "food_type": "AI",
+        "food_type_explicit": true,
+        "food_type_updated": true,
+        "stars": 5,
+        "stars_explicit": true,
+        "stars_updated": true,
+        "skip_quality_check": true
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    }
+  ]
+}

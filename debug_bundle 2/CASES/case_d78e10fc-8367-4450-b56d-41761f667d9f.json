@@ -1,0 +1,81 @@
+{
+  "conversation_id": "d78e10fc-8367-4450-b56d-41761f667d9f",
+  "exported_at": "2026-01-14T09:11:59.111319Z",
+  "summary": {
+    "total_turns": 2,
+    "total_errors": 0,
+    "first_message": "2026-01-14T08:53:26.674485Z",
+    "last_message": "2026-01-14T08:54:19.808882Z"
+  },
+  "messages": [
+    {
+      "turn_id": 1,
+      "user": "Хочу тур в Titanic Deluxe Lara, 2 взрослых, 12–20 июня, вылет Москва",
+      "assistant": "В какую страну планируете поездку?"
+    },
+    {
+      "turn_id": 2,
+      "user": "турция",
+      "assistant": "Вот туры в Titanic Deluxe Lara на 12.06:"
+    }
+  ],
+  "metadata_per_turn": [
+    {
+      "turn_id": 1,
+      "timestamp": "2026-01-14T08:53:26.674485Z",
+      "search_mode": "package",
+      "cascade_stage": 1,
+      "search_params": {
+        "departure_city": "Москва",
+        "date_from": "2026-06-12",
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "adults": 2,
+        "adults_explicit": true,
+        "hotel_name": "Titanic Deluxe Lara",
+        "hotel_name_explicit": true,
+        "date_to": "2026-06-20",
+        "skip_quality_check": true,
+        "nights": 8
+      },
+      "missing_params": [
+        "destination_country"
+      ],
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": true,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 2,
+      "timestamp": "2026-01-14T08:54:19.808882Z",
+      "search_mode": "package",
+      "cascade_stage": 6,
+      "search_params": {
+        "departure_city": "Москва",
+        "date_from": "2026-06-12",
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "adults": 2,
+        "adults_explicit": true,
+        "hotel_name": "Titanic Deluxe Lara",
+        "hotel_name_explicit": true,
+        "date_to": "2026-06-20",
+        "skip_quality_check": true,
+        "nights": 8,
+        "destination_country": "Турция"
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "conversation_id": "93fbde85-0e0b-4135-8031-18a59a1ad9d7",
+  "exported_at": "2026-01-14T09:11:59.115930Z",
+  "summary": {
+    "total_turns": 1,
+    "total_errors": 0,
+    "first_message": "2026-01-14T09:01:49.106856Z",
+    "last_message": "2026-01-14T09:01:49.106856Z"
+  },
+  "messages": [
+    {
+      "turn_id": 1,
+      "user": "Турция 9–16 июня, 2 взрослых, из Москвы, 5 звёзд, всё включено",
+      "assistant": "Вот варианты в Турция на 09.06:"
+    }
+  ],
+  "metadata_per_turn": [
+    {
+      "turn_id": 1,
+      "timestamp": "2026-01-14T09:01:49.106856Z",
+      "search_mode": "package",
+      "cascade_stage": 6,
+      "search_params": {
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "date_from": "2026-06-09",
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "adults": 2,
+        "adults_explicit": true,
+        "food_type": "AI",
+        "food_type_explicit": true,
+        "food_type_updated": true,
+        "stars": 5,
+        "stars_explicit": true,
+        "stars_updated": true,
+        "date_to": "2026-06-16",
+        "skip_quality_check": true,
+        "nights": 7
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": true,
+        "tour_offers_count": 3
+      }
+    }
+  ]
+}

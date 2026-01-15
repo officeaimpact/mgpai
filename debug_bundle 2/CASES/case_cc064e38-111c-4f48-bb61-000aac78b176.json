@@ -1,0 +1,104 @@
+{
+  "conversation_id": "cc064e38-111c-4f48-bb61-000aac78b176",
+  "exported_at": "2026-01-14T09:11:59.109327Z",
+  "summary": {
+    "total_turns": 3,
+    "total_errors": 0,
+    "first_message": "2026-01-14T08:48:26.708940Z",
+    "last_message": "2026-01-14T08:49:14.255698Z"
+  },
+  "messages": [
+    {
+      "turn_id": 1,
+      "user": "Турция 10–17 июня, 2 взрослых, из Москвы",
+      "assistant": "Какой уровень отеля — 5 звёзд всё включено или рассмотрим варианты?"
+    },
+    {
+      "turn_id": 2,
+      "user": "просто хорошие варианты",
+      "assistant": "ищу туры в Турцию с 10 по 17 июня для двух взрослых, вылетающих из Москвы. Рассматриваю различные варианты отелей. \n\nЕсть ли у вас какие-то предпочтения по уровню отеля или другим деталям?"
+    },
+    {
+      "turn_id": 3,
+      "user": "нет",
+      "assistant": "Вот варианты в Турция на 10.06:"
+    }
+  ],
+  "metadata_per_turn": [
+    {
+      "turn_id": 1,
+      "timestamp": "2026-01-14T08:48:26.708940Z",
+      "search_mode": "package",
+      "cascade_stage": 5,
+      "search_params": {
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "date_from": "2026-06-10",
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "adults": 2,
+        "adults_explicit": true,
+        "date_to": "2026-06-17",
+        "nights": 7
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": true,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 2,
+      "timestamp": "2026-01-14T08:48:38.150522Z",
+      "search_mode": "package",
+      "cascade_stage": 5,
+      "search_params": {
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "date_from": "2026-06-10",
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "adults": 2,
+        "adults_explicit": true,
+        "date_to": "2026-06-17",
+        "nights": 7
+      },
+      "missing_params": null,
+      "detected_intent": "general_chat",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 3,
+      "timestamp": "2026-01-14T08:49:14.255698Z",
+      "search_mode": "package",
+      "cascade_stage": 5,
+      "search_params": {
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "date_from": "2026-06-10",
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "adults": 2,
+        "adults_explicit": true,
+        "date_to": "2026-06-17",
+        "nights": 7
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 5
+      }
+    }
+  ]
+}

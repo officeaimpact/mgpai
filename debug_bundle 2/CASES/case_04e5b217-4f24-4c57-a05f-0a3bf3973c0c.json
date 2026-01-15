@@ -1,0 +1,74 @@
+{
+  "conversation_id": "04e5b217-4f24-4c57-a05f-0a3bf3973c0c",
+  "exported_at": "2026-01-14T09:11:59.105001Z",
+  "summary": {
+    "total_turns": 2,
+    "total_errors": 0,
+    "first_message": "2026-01-14T08:40:12.446652Z",
+    "last_message": "2026-01-14T08:40:55.941227Z"
+  },
+  "messages": [
+    {
+      "turn_id": 1,
+      "user": "Турция 10–17 июня, 2 взрослых, из Москвы",
+      "assistant": "Какой уровень отеля — 5 звёзд всё включено или рассмотрим варианты?"
+    },
+    {
+      "turn_id": 2,
+      "user": "5",
+      "assistant": "Вот варианты в Турция на 10.06:"
+    }
+  ],
+  "metadata_per_turn": [
+    {
+      "turn_id": 1,
+      "timestamp": "2026-01-14T08:40:12.446652Z",
+      "search_mode": "package",
+      "cascade_stage": 5,
+      "search_params": {
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "date_from": "2026-06-10",
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "adults": 2,
+        "adults_explicit": true,
+        "date_to": "2026-06-17",
+        "nights": 7
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": true,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 2,
+      "timestamp": "2026-01-14T08:40:55.941227Z",
+      "search_mode": "package",
+      "cascade_stage": 5,
+      "search_params": {
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "date_from": "2026-06-10",
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "adults": 2,
+        "adults_explicit": true,
+        "date_to": "2026-06-17",
+        "nights": 7
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 5
+      }
+    }
+  ]
+}

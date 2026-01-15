@@ -1,0 +1,173 @@
+{
+  "conversation_id": "c3ed4fcd-6fac-4f82-9e4f-42bcadb7f61d",
+  "exported_at": "2026-01-14T09:11:59.110186Z",
+  "summary": {
+    "total_turns": 5,
+    "total_errors": 0,
+    "first_message": "2026-01-14T08:50:14.580186Z",
+    "last_message": "2026-01-14T08:51:37.789796Z"
+  },
+  "messages": [
+    {
+      "turn_id": 1,
+      "user": "Rixos Premium Belek",
+      "assistant": "В какую страну планируете поездку?"
+    },
+    {
+      "turn_id": 2,
+      "user": "турция",
+      "assistant": "Из какого города вылет?"
+    },
+    {
+      "turn_id": 3,
+      "user": "москва",
+      "assistant": "Из Москвы в Турцию можно организовать комфортный перелёт. Подскажите, пожалуйста, даты вашей поездки?"
+    },
+    {
+      "turn_id": 4,
+      "user": "5 марта на 7 ночей",
+      "assistant": "Сколько человек поедет? Укажите взрослых и детей (если есть — с возрастом)."
+    },
+    {
+      "turn_id": 5,
+      "user": "2 взрослых 1 ребенок (5 лет)",
+      "assistant": "Вот туры в Rixos Premium Belek на 05.03:\n(Обратите внимание: в этот период море прохладное для купания.)"
+    }
+  ],
+  "metadata_per_turn": [
+    {
+      "turn_id": 1,
+      "timestamp": "2026-01-14T08:50:14.580186Z",
+      "search_mode": "package",
+      "cascade_stage": 1,
+      "search_params": {
+        "hotel_name": "Rixos Premium Belek",
+        "hotel_name_explicit": true,
+        "skip_quality_check": true
+      },
+      "missing_params": [
+        "destination_country",
+        "departure_city",
+        "date_from",
+        "adults",
+        "nights"
+      ],
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": true,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 2,
+      "timestamp": "2026-01-14T08:50:22.891126Z",
+      "search_mode": "package",
+      "cascade_stage": 2,
+      "search_params": {
+        "hotel_name": "Rixos Premium Belek",
+        "hotel_name_explicit": true,
+        "skip_quality_check": true,
+        "destination_country": "Турция"
+      },
+      "missing_params": [
+        "departure_city",
+        "date_from",
+        "adults",
+        "nights"
+      ],
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 3,
+      "timestamp": "2026-01-14T08:50:27.562603Z",
+      "search_mode": "package",
+      "cascade_stage": 3,
+      "search_params": {
+        "hotel_name": "Rixos Premium Belek",
+        "hotel_name_explicit": true,
+        "skip_quality_check": true,
+        "destination_country": "Турция",
+        "departure_city": "Москва"
+      },
+      "missing_params": [
+        "date_from",
+        "adults",
+        "nights"
+      ],
+      "detected_intent": "general_chat",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 4,
+      "timestamp": "2026-01-14T08:50:54.533254Z",
+      "search_mode": "package",
+      "cascade_stage": 4,
+      "search_params": {
+        "hotel_name": "Rixos Premium Belek",
+        "hotel_name_explicit": true,
+        "skip_quality_check": true,
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "date_from": "2026-03-05",
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "nights": 7,
+        "date_to": "2026-03-12"
+      },
+      "missing_params": [
+        "adults"
+      ],
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 5,
+      "timestamp": "2026-01-14T08:51:37.789796Z",
+      "search_mode": "package",
+      "cascade_stage": 6,
+      "search_params": {
+        "hotel_name": "Rixos Premium Belek",
+        "hotel_name_explicit": true,
+        "skip_quality_check": true,
+        "destination_country": "Турция",
+        "departure_city": "Москва",
+        "date_from": "2026-03-05",
+        "is_exact_date": true,
+        "dates_confirmed": true,
+        "date_precision": "exact",
+        "nights": 7,
+        "date_to": "2026-03-12",
+        "adults": 2,
+        "adults_explicit": true,
+        "children": [
+          5
+        ],
+        "children_count": 1,
+        "children_mentioned": false,
+        "children_count_mentioned": 0
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 1
+      }
+    }
+  ]
+}

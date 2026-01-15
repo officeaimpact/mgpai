@@ -1318,27 +1318,21 @@ class TourvisorService:
         
         КРИТИЧНО: Даты уже расширены в nodes.py — просто используем их!
         """
-        # ==================== P1 FIX: NIGHTS PRIORITY ====================
-        # КРИТИЧНО: Явно указанные пользователем ночи ВСЕГДА имеют приоритет!
-        # Диапазон дат (date_from/date_to) расширяется в nodes.py для гибкости поиска,
-        # но это НЕ должно влиять на количество ночей.
-        
+        # ==================== P0 STABILIZATION: NIGHTS & DATES ====================
         date_start = params.date_from
         date_end = params.date_to or params.date_from
         
-        # P1 FIX: Приоритет явных nights над вычисленными из дат
-        if params.nights:
-            # Ночи явно указаны пользователем — используем их БЕЗ ИЗМЕНЕНИЙ
-            nights_from = params.nights
-            logger.info(f"   📅 P1: Явные nights={nights_from}, даты поиска: {date_start.strftime('%d.%m')} - {date_end.strftime('%d.%m')}")
-        elif params.date_to and params.date_to != params.date_from:
-            # Ночи НЕ указаны, но есть точный диапазон дат (например "с 10 по 17 июня")
-            # В этом случае вычисляем nights из разницы
+        # P0: Если есть date_from и date_to (диапазон), вычисляем nights автоматически
+        if params.date_to and params.date_to != params.date_from:
+            # Это диапазон дат — вычисляем nights из разницы
             calculated_nights = (params.date_to - params.date_from).days
             nights_from = calculated_nights if calculated_nights > 0 else 7
-            logger.info(f"   📅 P1: Вычислено из диапазона: nights={nights_from} ({date_start.strftime('%d.%m')} - {date_end.strftime('%d.%m')})")
+            logger.info(f"   📅 P0: Диапазон дат {date_start.strftime('%d.%m')} - {date_end.strftime('%d.%m')}, nights={nights_from} (вычислено)")
+        elif params.nights:
+            nights_from = params.nights
+            logger.info(f"   📅 Даты: {date_start.strftime('%d.%m')} - {date_end.strftime('%d.%m')}, nights={nights_from} (указано)")
         else:
-            logger.warning("⚠️ P1: nights не указан и нет диапазона — fallback=7")
+            logger.error("❌ P0 ERROR: nights не указан и нет диапазона дат!")
             nights_from = 7  # Fallback
         
         # Расширенный диапазон ночей: +2 ночи для гибкости

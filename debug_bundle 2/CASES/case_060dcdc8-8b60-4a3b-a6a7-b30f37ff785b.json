@@ -1,0 +1,241 @@
+{
+  "conversation_id": "060dcdc8-8b60-4a3b-a6a7-b30f37ff785b",
+  "exported_at": "2026-01-14T09:11:59.113578Z",
+  "summary": {
+    "total_turns": 7,
+    "total_errors": 0,
+    "first_message": "2026-01-14T08:57:20.915687Z",
+    "last_message": "2026-01-14T08:59:37.838268Z"
+  },
+  "messages": [
+    {
+      "turn_id": 1,
+      "user": "турция",
+      "assistant": "Из какого города вылет?"
+    },
+    {
+      "turn_id": 2,
+      "user": "сочи",
+      "assistant": "Когда планируете вылет?"
+    },
+    {
+      "turn_id": 3,
+      "user": "3 ферваля",
+      "assistant": "На сколько ночей планируете поездку?"
+    },
+    {
+      "turn_id": 4,
+      "user": "5 ночей",
+      "assistant": "Сколько человек поедет? Укажите взрослых и детей (если есть — с возрастом)."
+    },
+    {
+      "turn_id": 5,
+      "user": "2 взрослых 1 ребенок 5 лет",
+      "assistant": "На 03.02 вылетов из Сочи нет. Посмотреть соседние даты?"
+    },
+    {
+      "turn_id": 6,
+      "user": "да",
+      "assistant": "Я проверил даты с 29.01 по 08.02, но рейсов из Сочи нет.\nПопробовать вылет из Москвы?"
+    },
+    {
+      "turn_id": 7,
+      "user": "да",
+      "assistant": "Вот варианты в Россия на 03.02:"
+    }
+  ],
+  "metadata_per_turn": [
+    {
+      "turn_id": 1,
+      "timestamp": "2026-01-14T08:57:20.915687Z",
+      "search_mode": "package",
+      "cascade_stage": 2,
+      "search_params": {
+        "destination_country": "Турция"
+      },
+      "missing_params": [
+        "departure_city",
+        "date_from",
+        "adults",
+        "nights"
+      ],
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": true,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 2,
+      "timestamp": "2026-01-14T08:57:25.051581Z",
+      "search_mode": "package",
+      "cascade_stage": 3,
+      "search_params": {
+        "destination_country": "Россия",
+        "destination_resort": "Сочи",
+        "departure_city": "Сочи",
+        "destination_region": "Сочи",
+        "skip_quality_check": false
+      },
+      "missing_params": [
+        "date_from",
+        "adults",
+        "nights"
+      ],
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 3,
+      "timestamp": "2026-01-14T08:57:29.930587Z",
+      "search_mode": "package",
+      "cascade_stage": 4,
+      "search_params": {
+        "destination_country": "Россия",
+        "destination_resort": "Сочи",
+        "departure_city": "Сочи",
+        "destination_region": "Сочи",
+        "skip_quality_check": false,
+        "date_from": "2026-02-03",
+        "dates_confirmed": true
+      },
+      "missing_params": [
+        "adults",
+        "nights"
+      ],
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 4,
+      "timestamp": "2026-01-14T08:57:34.984939Z",
+      "search_mode": "package",
+      "cascade_stage": 4,
+      "search_params": {
+        "destination_country": "Россия",
+        "destination_resort": "Сочи",
+        "departure_city": "Сочи",
+        "destination_region": "Сочи",
+        "skip_quality_check": false,
+        "date_from": "2026-02-03",
+        "dates_confirmed": true,
+        "nights": 5,
+        "date_to": "2026-02-08"
+      },
+      "missing_params": [
+        "adults"
+      ],
+      "detected_intent": "other",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 5,
+      "timestamp": "2026-01-14T08:58:22.057326Z",
+      "search_mode": "package",
+      "cascade_stage": 6,
+      "search_params": {
+        "destination_country": "Россия",
+        "destination_resort": "Сочи",
+        "departure_city": "Сочи",
+        "destination_region": "Сочи",
+        "skip_quality_check": false,
+        "date_from": "2026-02-03",
+        "dates_confirmed": true,
+        "nights": 5,
+        "date_to": "2026-02-08",
+        "adults": 2,
+        "adults_explicit": true,
+        "children": [
+          5
+        ],
+        "children_count": 1,
+        "children_mentioned": false,
+        "children_count_mentioned": 0
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 6,
+      "timestamp": "2026-01-14T08:58:54.619486Z",
+      "search_mode": "package",
+      "cascade_stage": 6,
+      "search_params": {
+        "destination_country": "Россия",
+        "destination_resort": "Сочи",
+        "departure_city": "Сочи",
+        "destination_region": "Сочи",
+        "skip_quality_check": false,
+        "date_from": "2026-02-03",
+        "dates_confirmed": true,
+        "nights": 5,
+        "date_to": "2026-02-08",
+        "adults": 2,
+        "adults_explicit": true,
+        "children": [
+          5
+        ],
+        "children_count": 1,
+        "children_mentioned": false,
+        "children_count_mentioned": 0
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 0
+      }
+    },
+    {
+      "turn_id": 7,
+      "timestamp": "2026-01-14T08:59:37.838268Z",
+      "search_mode": "package",
+      "cascade_stage": 6,
+      "search_params": {
+        "destination_country": "Россия",
+        "destination_resort": "Сочи",
+        "departure_city": "Москва",
+        "destination_region": "Сочи",
+        "skip_quality_check": false,
+        "date_from": "2026-02-03",
+        "dates_confirmed": true,
+        "nights": 5,
+        "date_to": "2026-02-08",
+        "adults": 2,
+        "adults_explicit": true,
+        "children": [
+          5
+        ],
+        "children_count": 1,
+        "children_mentioned": false,
+        "children_count_mentioned": 0
+      },
+      "missing_params": null,
+      "detected_intent": "search_tour",
+      "last_question_type": null,
+      "extra": {
+        "is_first_message": false,
+        "tour_offers_count": 5
+      }
+    }
+  ]
+}

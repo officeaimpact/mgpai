@@ -1,0 +1,331 @@
+{
+  "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+  "exported_at": "2026-01-14T09:11:59.106779Z",
+  "summary": {
+    "total_api_calls": 17,
+    "total_errors": 0,
+    "total_elapsed_ms": 1544.71,
+    "avg_elapsed_ms": 90.87,
+    "endpoints": {
+      "search.php": 1,
+      "result.php": 16
+    }
+  },
+  "traces": [
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "search.php",
+      "request_params": {
+        "departure": 1,
+        "country": 1,
+        "datefrom": "03.04.2026",
+        "dateto": "03.04.2026",
+        "nightsfrom": 7,
+        "nightsto": 9,
+        "adults": 2,
+        "hideregular": 0,
+        "starsfrom": 4,
+        "starsto": 4,
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 127.45,
+      "response_summary": "requestid=11493634880",
+      "timestamp": "2026-01-14T08:42:59.055649Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 66.67,
+      "result_count": 0,
+      "response_summary": "progress=21%, hotels=0",
+      "timestamp": "2026-01-14T08:43:01.125497Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 97.03,
+      "result_count": 0,
+      "response_summary": "progress=40%, hotels=0",
+      "timestamp": "2026-01-14T08:43:03.223952Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 70.28,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:05.297064Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 70.52,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:07.369525Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 71.15,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:09.443474Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 75.46,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:11.521646Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 64.61,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:13.586884Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 87.89,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:15.676559Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 127.72,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:17.807975Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 94.31,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:19.903378Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 73.9,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:21.979085Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 75.71,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:24.057270Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 92.08,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:26.151369Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 102.14,
+      "result_count": 0,
+      "response_summary": "progress=51%, hotels=0",
+      "timestamp": "2026-01-14T08:43:28.255769Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "status",
+        "requestid": "11493634880",
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 83.17,
+      "result_count": 0,
+      "response_summary": "progress=100%, hotels=0",
+      "timestamp": "2026-01-14T08:43:30.340217Z"
+    },
+    {
+      "type": "api_trace",
+      "conversation_id": "62993d91-e89d-423d-bd69-1779a21f7da0",
+      "turn_id": 4,
+      "endpoint": "result.php",
+      "request_params": {
+        "type": "result",
+        "requestid": "11493634880",
+        "page": 1,
+        "onpage": 100,
+        "authlogin": "***MASKED***",
+        "authpass": "***MASKED***",
+        "format": "json"
+      },
+      "status_code": 200,
+      "elapsed_ms": 164.62,
+      "result_count": 98,
+      "response_summary": "progress=100%, hotels=98",
+      "timestamp": "2026-01-14T08:43:30.506016Z"
+    }
+  ]
+}
