@@ -445,115 +445,182 @@ def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
     }
     
     dates_found = []
+    today = date.today()
+    current_year = today.year
     
-    # dd.mm.yyyy
-    for match in re.finditer(r'(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?', text):
-        day, month = int(match.group(1)), int(match.group(2))
-        year = int(match.group(3)) if match.group(3) else date.today().year
-        if year < 100:
-            year += 2000
-        try:
-            d = date(year, month, day)
-            if d < date.today():
-                d = date(year + 1, month, day)
-            dates_found.append(d)
-        except ValueError:
-            pass
+    # ==================== P6: ПРАЗДНИКИ (проверяем ПЕРВЫМИ!) ====================
+    holiday_patterns = [
+        # Новый год (28 дек - 8 янв)
+        (r'на\s+новый\s+год|новогодн|на\s+нг\b', lambda y: (date(y, 12, 28), date(y + 1, 1, 8))),
+        # 23 февраля (21-25 февраля)
+        (r'на\s+23\s*февраля|на\s+день\s+защитник', lambda y: (date(y, 2, 21), date(y, 2, 25))),
+        # 8 марта (6-10 марта)
+        (r'на\s+8\s*марта|на\s+восьмо?е?\s*марта|на\s+женский\s+день', lambda y: (date(y, 3, 6), date(y, 3, 10))),
+        # Майские праздники (28 апр - 10 мая)
+        (r'на\s+майски[ех]|майские\s+праздник', lambda y: (date(y, 4, 28), date(y, 5, 10))),
+        # День России (10-14 июня)
+        (r'на\s+12\s*июня|на\s+день\s+росси', lambda y: (date(y, 6, 10), date(y, 6, 14))),
+    ]
     
-    # "dd месяца"
-    for match in re.finditer(r'(\d{1,2})\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)', text_lower):
-        day = int(match.group(1))
-        month = months_map[match.group(2)]
-        year = date.today().year
-        try:
-            d = date(year, month, day)
-            if d < date.today():
-                d = date(year + 1, month, day)
-            dates_found.append(d)
-        except ValueError:
-            pass
+    for pattern, date_func in holiday_patterns:
+        if re.search(pattern, text_lower):
+            try:
+                date_from, date_to = date_func(current_year)
+                if date_to < today:
+                    date_from, date_to = date_func(current_year + 1)
+                nights = (date_to - date_from).days
+                entities["date_from"] = date_from
+                entities["date_to"] = date_to
+                entities["nights"] = nights
+                entities["dates_confirmed"] = True
+                entities["is_exact_date"] = True
+                entities["date_precision"] = "holiday"
+                logger.info(f"   🎉 P6: Праздник найден: {date_from} - {date_to} ({nights} ночей)")
+            except Exception as e:
+                logger.warning(f"   ⚠️ P6: Ошибка парсинга праздника: {e}")
+            break
     
-    # === P1: MONTH-ONLY DATES ===
-    # Месяц без даты — НЕ подтверждаем дату, спрашиваем уточнение!
+    # ==================== P6: ВЫХОДНЫЕ ====================
+    if not entities.get("date_precision"):
+        weekend_patterns = [
+            (r'на\s+эти\s+выходн|на\s+выходн|в\s+выходн', 0),
+            (r'на\s+следующи[ех]\s+выходн', 7),
+        ]
+        for pattern, days_offset in weekend_patterns:
+            if re.search(pattern, text_lower):
+                days_until_saturday = (5 - today.weekday()) % 7
+                if days_until_saturday == 0 and today.weekday() != 5:
+                    days_until_saturday = 7
+                saturday = today + timedelta(days=days_until_saturday + days_offset)
+                sunday = saturday + timedelta(days=1)
+                entities["date_from"] = saturday
+                entities["date_to"] = sunday
+                entities["nights"] = 2
+                entities["dates_confirmed"] = True
+                entities["is_exact_date"] = True
+                entities["date_precision"] = "weekend"
+                logger.info(f"   📅 P6: Выходные: {saturday} - {sunday} (2 ночей)")
+                break
+    
+    # ==================== P6: ОТНОСИТЕЛЬНЫЕ ДАТЫ ====================
+    if not entities.get("date_precision"):
+        relative_patterns = [
+            (r'через\s+недел[юь]|через\s+1\s*недел', 7),
+            (r'через\s+(две|2)\s*недел', 14),
+            (r'через\s+месяц', 30),
+        ]
+        for pattern, days_offset in relative_patterns:
+            if re.search(pattern, text_lower):
+                target_date = today + timedelta(days=days_offset)
+                entities["date_from"] = target_date
+                entities["dates_confirmed"] = True
+                entities["is_exact_date"] = True
+                entities["date_precision"] = "exact"
+                logger.info(f"   📅 P6: Относительная дата: +{days_offset} дней = {target_date}")
+                break
+    
+    # ==================== Стандартный парсинг (если P6 не нашёл) ====================
     is_month_only = False
     detected_month = None
     
-    if not dates_found:
-        month_patterns = [
-            (r'(?:в|на|к)?\s*январ[еья]?', 1), (r'(?:в|на|к)?\s*феврал[еья]?', 2),
-            (r'(?:в|на|к)?\s*март[еа]?', 3), (r'(?:в|на|к)?\s*апрел[еья]?', 4),
-            (r'(?:в|на|к)?\s*ма[йюея]', 5), (r'(?:в|на|к)?\s*июн[еья]?', 6),
-            (r'(?:в|на|к)?\s*июл[еья]?', 7), (r'(?:в|на|к)?\s*август[еа]?', 8),
-            (r'(?:в|на|к)?\s*сентябр[еья]?', 9), (r'(?:в|на|к)?\s*октябр[еья]?', 10),
-            (r'(?:в|на|к)?\s*ноябр[еья]?', 11), (r'(?:в|на|к)?\s*декабр[еья]?', 12),
-        ]
+    if not entities.get("date_precision"):
+        # dd.mm.yyyy
+        for match in re.finditer(r'(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?', text):
+            day, month = int(match.group(1)), int(match.group(2))
+            year = int(match.group(3)) if match.group(3) else today.year
+            if year < 100:
+                year += 2000
+            try:
+                d = date(year, month, day)
+                if d < today:
+                    d = date(year + 1, month, day)
+                dates_found.append(d)
+            except ValueError:
+                pass
         
-        # Также проверяем сезоны
-        season_patterns = [
-            (r'лет[оауе]м?', [6, 7, 8]),
-            (r'зим[оауе]й?', [12, 1, 2]),
-            (r'осень[юи]?', [9, 10, 11]),
-            (r'весн[оауе]й?', [3, 4, 5]),
-        ]
+        # "dd месяца"
+        for match in re.finditer(r'(\d{1,2})\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)', text_lower):
+            day = int(match.group(1))
+            month = months_map[match.group(2)]
+            year = today.year
+            try:
+                d = date(year, month, day)
+                if d < today:
+                    d = date(year + 1, month, day)
+                dates_found.append(d)
+            except ValueError:
+                pass
         
-        for pattern, month_num in month_patterns:
-            if re.search(pattern, text_lower):
-                is_month_only = True
-                detected_month = month_num
-                year = date.today().year
-                try:
-                    target = date(year, month_num, 1)
-                    if target < date.today():
-                        target = date(year + 1, month_num, 1)
-                    dates_found.append(target)
-                except ValueError:
-                    pass
-                break
-        
-        # Сезоны — ещё более размытые
-        if not is_month_only:
-            for pattern, months in season_patterns:
+        # === P1: MONTH-ONLY DATES ===
+        if not dates_found:
+            month_patterns = [
+                (r'(?:в|на|к)?\s*январ[еья]?', 1), (r'(?:в|на|к)?\s*феврал[еья]?', 2),
+                (r'(?:в|на|к)?\s*март[еа]?', 3), (r'(?:в|на|к)?\s*апрел[еья]?', 4),
+                (r'(?:в|на|к)?\s*ма[йюея]', 5), (r'(?:в|на|к)?\s*июн[еья]?', 6),
+                (r'(?:в|на|к)?\s*июл[еья]?', 7), (r'(?:в|на|к)?\s*август[еа]?', 8),
+                (r'(?:в|на|к)?\s*сентябр[еья]?', 9), (r'(?:в|на|к)?\s*октябр[еья]?', 10),
+                (r'(?:в|на|к)?\s*ноябр[еья]?', 11), (r'(?:в|на|к)?\s*декабр[еья]?', 12),
+            ]
+            
+            season_patterns = [
+                (r'лет[оауе]м?', [6, 7, 8]),
+                (r'зим[оауе]й?', [12, 1, 2]),
+                (r'осень[юи]?', [9, 10, 11]),
+                (r'весн[оауе]й?', [3, 4, 5]),
+            ]
+            
+            for pattern, month_num in month_patterns:
                 if re.search(pattern, text_lower):
-                    is_month_only = True  # Сезон = month_only с точки зрения precision
-                    detected_month = months[1]  # Средний месяц сезона
-                    year = date.today().year
+                    is_month_only = True
+                    detected_month = month_num
+                    year = today.year
                     try:
-                        target = date(year, months[1], 1)
-                        if target < date.today():
-                            target = date(year + 1, months[1], 1)
+                        target = date(year, month_num, 1)
+                        if target < today:
+                            target = date(year + 1, month_num, 1)
                         dates_found.append(target)
                     except ValueError:
                         pass
                     break
-    
-    if dates_found:
-        dates_found.sort()
-        # === ВАЛИДАЦИЯ: дата НЕ должна быть в прошлом! ===
-        valid_dates = [d for d in dates_found if d >= date.today()]
-        if valid_dates:
-            entities["date_from"] = valid_dates[0]
             
-            # === P1: MONTH-ONLY НЕ ПОДТВЕРЖДАЕТ ДАТУ! ===
-            if is_month_only:
-                # Месяц указан без числа — НЕ подтверждаем, спрашиваем уточнение
-                entities["dates_confirmed"] = False
-                entities["is_exact_date"] = False
-                entities["date_precision"] = "month"
-                entities["detected_month"] = detected_month
-                logger.info(f"   📅 P1: Месяц-only дата {valid_dates[0]}, date_precision=month (НЕ ПОДТВЕРЖДАЕМ!)")
-            elif len(valid_dates) > 1 and valid_dates[-1] != valid_dates[0]:
-                # Это ДИАПАЗОН дат (10-17 июня) — точная дата!
-                entities["date_to"] = valid_dates[-1]
-                entities["nights"] = (valid_dates[-1] - valid_dates[0]).days
-                entities["is_exact_date"] = True  # P1 FIX: диапазон — это точные даты!
-                entities["dates_confirmed"] = True
-                entities["date_precision"] = "exact"
-                logger.info(f"   📅 P1: Диапазон дат {valid_dates[0]} - {valid_dates[-1]} (dates_confirmed=True)")
-            else:
-                # Одна конкретная дата — точная дата
-                entities["is_exact_date"] = True
-                entities["dates_confirmed"] = True
-                entities["date_precision"] = "exact"
+            if not is_month_only:
+                for pattern, months in season_patterns:
+                    if re.search(pattern, text_lower):
+                        is_month_only = True
+                        detected_month = months[1]
+                        year = today.year
+                        try:
+                            target = date(year, months[1], 1)
+                            if target < today:
+                                target = date(year + 1, months[1], 1)
+                            dates_found.append(target)
+                        except ValueError:
+                            pass
+                        break
+        
+        if dates_found:
+            dates_found.sort()
+            valid_dates = [d for d in dates_found if d >= today]
+            if valid_dates:
+                entities["date_from"] = valid_dates[0]
+                
+                if is_month_only:
+                    entities["dates_confirmed"] = False
+                    entities["is_exact_date"] = False
+                    entities["date_precision"] = "month"
+                    entities["detected_month"] = detected_month
+                    logger.info(f"   📅 P1: Месяц-only дата {valid_dates[0]}, date_precision=month")
+                elif len(valid_dates) > 1 and valid_dates[-1] != valid_dates[0]:
+                    entities["date_to"] = valid_dates[-1]
+                    entities["nights"] = (valid_dates[-1] - valid_dates[0]).days
+                    entities["is_exact_date"] = True
+                    entities["dates_confirmed"] = True
+                    entities["date_precision"] = "exact"
+                    logger.info(f"   📅 P1: Диапазон дат {valid_dates[0]} - {valid_dates[-1]}")
+                else:
+                    entities["is_exact_date"] = True
+                    entities["dates_confirmed"] = True
+                    entities["date_precision"] = "exact"
     
     # 5. Количество ночей
     # КРИТИЧНО: Валидация — nights не может быть > 21 без ЯВНОГО запроса!
@@ -1010,6 +1077,13 @@ async def extract_entities_with_llm(text: str, awaiting_phone: bool = False, las
             if key == "departure_city" and key in regex_entities:
                 continue
             
+            # P6 FIX: НЕ перезаписываем даты праздников/выходных/месяцев
+            # LLM может интерпретировать "новый год" как 31.12, но праздник = 28.12-08.01
+            date_precision = regex_entities.get("date_precision")
+            if key in ("date_from", "date_to", "nights", "dates_confirmed", "is_exact_date", "date_precision") and date_precision in ("holiday", "weekend", "month"):
+                logger.info(f"   🛡️ P6: Защита даты ({date_precision}) — LLM не перезаписывает {key}")
+                continue
+            
             final_entities[key] = value
     
     intent = llm_intent if llm_intent else regex_intent
@@ -1439,13 +1513,16 @@ async def input_analyzer(state: AgentState) -> AgentState:
         # НЕ устанавливаем stars и food_type — пусть поиск вернёт все варианты
     
     # Автоматический расчёт ночей
+    # P6: НЕ пересчитываем если это праздник/выходные — nights уже корректны
     if "date_from" in merged_params and "date_to" in merged_params:
         d_from = merged_params["date_from"]
         d_to = merged_params["date_to"]
         if isinstance(d_from, date) and isinstance(d_to, date):
-            nights = (d_to - d_from).days
-            if nights > 0:
-                merged_params["nights"] = nights
+            # P6: Праздники и выходные уже имеют корректные nights
+            if merged_params.get("date_precision") not in ("holiday", "weekend"):
+                nights = (d_to - d_from).days
+                if nights > 0:
+                    merged_params["nights"] = nights
     
     if "date_from" in merged_params and "nights" in merged_params and "date_to" not in merged_params:
         d_from = merged_params["date_from"]
