@@ -1005,6 +1005,11 @@ async def extract_entities_with_llm(text: str, awaiting_phone: bool = False, las
             if key in ("adults", "nights") and key in regex_entities:
                 continue
             
+            # P5 FIX: НЕ перезаписываем departure_city если regex уже нормализовал
+            # Regex: "питер" → "Санкт-Петербург", LLM может вернуть "Питер" — это хуже!
+            if key == "departure_city" and key in regex_entities:
+                continue
+            
             final_entities[key] = value
     
     intent = llm_intent if llm_intent else regex_intent
@@ -1626,7 +1631,11 @@ async def tour_searcher(state: AgentState) -> AgentState:
     
     # ==================== P1: ГОРЯЩИЕ ТУРЫ ЧЕРЕЗ hottours.php ====================
     # Для горящих туров используем ДРУГОЙ API endpoint — без обязательных дат/ночей!
-    is_hot_tours = state.get("intent") == "hot_tours" or params.get("is_hot_tour", False)
+    intent = state.get("intent")
+    is_hot_param = params.get("is_hot_tour", False)
+    is_hot_tours = intent == "hot_tours" or is_hot_param
+    
+    logger.info(f"   🔍 tour_searcher: intent={intent}, is_hot_param={is_hot_param}, is_hot_tours={is_hot_tours}")
     
     if is_hot_tours:
         logger.info("🔥 P1: Горящие туры — используем hottours.php")
@@ -2159,7 +2168,30 @@ async def responder(state: AgentState) -> AgentState:
         state["pending_action"] = None
         return state
     
+    # ==================== P5 FIX: ГОРЯЩИЕ ТУРЫ — ОТДЕЛЬНАЯ ВЕТКА ====================
+    # Для горящих туров НЕ нужны даты/ночи — hottours.php возвращает их сам!
+    # Изолированная логика: НЕ затрагивает обычный каскад.
+    is_hot_tour = params.get("is_hot_tour", False) or state.get("intent") == "hot_tours"
+    
+    if is_hot_tour:
+        logger.info("🔥 P5: Горящие туры — проверяем минимальные параметры")
+        
+        # Для горящих нужен только город вылета (страна опционально)
+        has_departure = params.get("departure_city")
+        
+        if not has_departure:
+            # Спрашиваем только город вылета
+            state["response"] = "Из какого города вылет?"
+            state["last_question_type"] = "departure_city"
+            return state
+        
+        # Всё есть для горящих — сразу на поиск!
+        logger.info(f"🔥 P5: Горящие туры готовы к поиску: departure={has_departure}")
+        state["cascade_stage"] = 6  # Переходим сразу к поиску
+        # НЕ возвращаем state — пусть дойдёт до tour_searcher
+    
     # КАСКАД ВОПРОСОВ (строгий порядок)
+    # P5: Для горящих туров этот блок пропускается (cascade_stage=6)
     
     # ==================== ФОРМИРОВАНИЕ КОНТЕКСТА ====================
     # Собираем что УЖЕ знаем для подтверждения в ответе
@@ -2206,9 +2238,17 @@ async def responder(state: AgentState) -> AgentState:
         return state
     
     # Этап 3: нужны даты — кратко и по делу
+    # P5 FIX: Для горящих туров пропускаем вопрос о дате!
     if cascade_stage == 3:
-        state["response"] = "Когда планируете вылет?"
-        return state
+        is_hot = params.get("is_hot_tour", False) or state.get("intent") == "hot_tours"
+        if is_hot:
+            # Горящие туры — дата не нужна, сразу на поиск
+            logger.info("🔥 P5: Пропускаем вопрос о дате для горящих туров")
+            state["cascade_stage"] = 6
+            # Продолжаем без return — дойдём до tour_searcher
+        else:
+            state["response"] = "Когда планируете вылет?"
+            return state
     
     # --- ЭТАП 4: HARD VALIDATION (Критические параметры) ---
     # Без этих данных поиск технически невозможен или даст неверную цену.
@@ -2648,9 +2688,16 @@ def should_search(state: AgentState) -> str:
     if intent == "general_chat":
         return "general_chat"
     
-    # Если intent явно "search_tour" и cascade_stage == 6 (установлено в input_analyzer)
+    # ==================== P5 FIX: ГОРЯЩИЕ ТУРЫ ====================
+    # Для горящих туров НЕ нужны даты/ночи — только departure_city!
+    is_hot = params.get("is_hot_tour", False) or intent == "hot_tours"
+    if is_hot and params.get("departure_city"):
+        logger.info("🔥 should_search: Горящие туры готовы — сразу на поиск!")
+        return "search"
+    
+    # Если intent явно "search_tour" или "hot_tours" и cascade_stage == 6
     # Сразу переходим к поиску
-    if intent == "search_tour" and state.get("cascade_stage") == 6:
+    if intent in ("search_tour", "hot_tours") and state.get("cascade_stage") == 6:
         return "search"
     
     # Каскад (пересчитываем только если не было явного указания)

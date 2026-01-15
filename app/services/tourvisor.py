@@ -1859,7 +1859,11 @@ class TourvisorService:
             
             response = await self._request("hottours.php", params)
             
-            tours_data = response.get("data", {}).get("tour", [])
+            # P5 FIX: Структура ответа hottours.php — {"hottours": {"tour": [...]}}
+            hottours_data = response.get("hottours", {})
+            tours_data = hottours_data.get("tour", []) if isinstance(hottours_data, dict) else []
+            
+            logger.info(f"   🔥 hottours structure: hottours={type(hottours_data).__name__}, tours={len(tours_data) if isinstance(tours_data, list) else 'N/A'}")
             
             if isinstance(tours_data, dict):
                 tours_data = [tours_data]
