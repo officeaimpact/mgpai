@@ -928,6 +928,23 @@ async def extract_entities_with_llm(text: str, awaiting_phone: bool = False) -> 
                     llm_entities["children"] = validated_children if validated_children else None
                 else:
                     del llm_entities["children"]
+            
+            # ==================== P2 FIX: hotel_name — фильтруем "null"/"none" ====================
+            # YandexGPT иногда возвращает строку "null" вместо того чтобы пропустить поле
+            if "hotel_name" in llm_entities:
+                val = llm_entities["hotel_name"]
+                if isinstance(val, str):
+                    if val.lower() in ("null", "none", "", "не указан", "не указано", "нет"):
+                        del llm_entities["hotel_name"]
+                        logger.info(f"   ⚠️ P2: LLM вернул hotel_name='{val}' — игнорируем")
+            
+            # search_mode: фильтруем "null"/"none"
+            if "search_mode" in llm_entities:
+                val = llm_entities["search_mode"]
+                if isinstance(val, str):
+                    if val.lower() in ("null", "none", "", "не указано"):
+                        del llm_entities["search_mode"]
+                        logger.info(f"   ⚠️ P2: LLM вернул search_mode='{val}' — игнорируем")
                     
         except Exception as e:
             print(f"LLM extraction failed: {e}")
