@@ -840,6 +840,27 @@ def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
                 entities["date_to"] = entities["date_from"] + timedelta(days=nights)
         # Если > 30 — игнорируем (скорее всего ошибка/галлюцинация)
     
+    # ==================== P1 FIX: ПАТТЕРН "ДНЕЙ X" ====================
+    # Пользователь может сказать "дней 10", "на 5 дней", "10 дней"
+    # Конвертируем в ночи (для туризма дни ≈ ночи)
+    if "nights" not in entities:
+        days_patterns = [
+            r'(\d+)\s*дн(?:ей|я|ь)',      # "10 дней", "5 дня", "1 день"
+            r'дн(?:ей|я)\s*(\d+)',         # "дней 10"
+            r'на\s*(\d+)\s*дн',            # "на 10 дней"
+        ]
+        for pattern in days_patterns:
+            days_match = re.search(pattern, text_lower)
+            if days_match:
+                days = int(days_match.group(1))
+                if 1 <= days <= 30:
+                    entities["nights"] = days
+                    entities["nights_explicit"] = True
+                    logger.info(f"   📅 P1 FIX: Распознано 'дней {days}' → nights={days}")
+                    if "date_from" in entities and "date_to" not in entities:
+                        entities["date_to"] = entities["date_from"] + timedelta(days=days)
+                    break
+    
     # ==================== ЭТАП 2: ПАТТЕРН N+M (взрослые + дети) ====================
     # Формат: "2+1", "4+4", "3+2" — первое число = взрослые, второе = дети
     # ВАЖНО: Это НЕ возраст детей, а количество! Возраст нужно будет уточнить.

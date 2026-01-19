@@ -124,6 +124,8 @@ class AgentState(TypedDict):
     missing_child_ages: int
     # Контекст последнего вопроса (для интерпретации коротких ответов типа "5")
     last_question_type: Optional[str]  # "nights", "adults", "stars", "dates", etc.
+    # P2 FIX: Город двойного назначения (Сочи/Анапа), требующий уточнения
+    ambiguous_city: Optional[str]
     # === PAGINATION (GAP Analysis) ===
     # ID последнего поискового запроса (для пагинации и continue)
     last_search_id: Optional[str]
@@ -470,6 +472,7 @@ def create_initial_state() -> AgentState:
         offered_lower_stars=False,  # GAP Analysis: Smart Fallback по звёздам
         missing_child_ages=0,
         last_question_type=None,  # Контекст для интерпретации "5" → nights/adults
+        ambiguous_city=None,  # P2 FIX: Город двойного назначения
         # === PAGINATION (GAP Analysis) ===
         last_search_id=None,
         last_country_id=None,

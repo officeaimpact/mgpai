@@ -1910,6 +1910,16 @@ class TourvisorService:
             logger.error(f"❌ Ошибка получения горящих туров: {e}")
             return []
     
+    def _fix_photo_url(self, url: str) -> str:
+        """
+        P0 FIX: Исправляет protocol-relative URL (//...) на полный https://...
+        Проблема: Tourvisor возвращает URL типа //static.tourvisor.ru/...
+        Браузер не загружает такие URL без протокола.
+        """
+        if url and url.startswith('//'):
+            return 'https:' + url
+        return url or ""
+    
     def _parse_hot_tour(self, tour: dict, departure_city: str = "Москва") -> Optional[TourOffer]:
         """Парсинг горящего тура."""
         
@@ -1944,7 +1954,8 @@ class TourvisorService:
             operator=tour.get("operatorname", ""),
             hotel_link=tour.get("fulldesclink", ""),
             # P4 FIX: для hottours поле называется "hotelpicture", не "picturelink"
-            hotel_photo=tour.get("hotelpicture", ""),
+            # P0 FIX: исправляем protocol-relative URL (//...) на https://...
+            hotel_photo=self._fix_photo_url(tour.get("hotelpicture", "")),
         )
     
     # ==================== 5. АКТУАЛИЗАЦИЯ (actualize.php, actdetail.php) ====================
