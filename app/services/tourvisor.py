@@ -1342,8 +1342,11 @@ class TourvisorService:
             logger.warning("⚠️ P1: nights не указан и нет диапазона — fallback=7")
             nights_from = 7  # Fallback
         
-        # Расширенный диапазон ночей: +2 ночи для гибкости
-        nights_to = nights_from + 2
+        # ==================== R7 FIX: Уменьшенный диапазон ночей ====================
+        # Было +2 (7→9), стало +1 (7→8) для более точного соответствия запросу
+        # Это решает проблему "запросил 7 ночей, получил 8"
+        nights_to = nights_from + 1
+        logger.info(f"   R7 FIX: nightsfrom={nights_from}, nightsto={nights_to}")
         
         # ==================== DEPARTURE: P0 STABILIZATION ====================
         # departure=0 ставится ТОЛЬКО для hotel_only режима!
