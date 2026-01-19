@@ -749,9 +749,10 @@ def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
     for wp in week_patterns_extract:
         if re.search(wp, text_lower):
             entities["nights"] = 7
+            entities["nights_explicit"] = True  # P1 FIX: Флаг явного указания
             if "date_from" in entities and "date_to" not in entities:
                 entities["date_to"] = entities["date_from"] + timedelta(days=7)
-            logger.info(f"   🌙 P1 FIX: Парсинг 'на неделю' → nights=7")
+            logger.info(f"   🌙 P1 FIX: Парсинг 'на неделю' → nights=7, nights_explicit=True")
             break
     
     # Потом проверяем числовые паттерны (если nights ещё не установлен)
@@ -762,11 +763,13 @@ def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
         # Более 21 ночи — только если явно запросили (например "30 ночей")
         if 1 <= nights <= 21:
             entities["nights"] = nights
+            entities["nights_explicit"] = True  # P1 FIX: Флаг явного указания
             if "date_from" in entities and "date_to" not in entities:
                 entities["date_to"] = entities["date_from"] + timedelta(days=nights)
         elif nights > 21 and nights <= 30:
             # Длинный тур — помечаем явно, но принимаем
             entities["nights"] = nights
+            entities["nights_explicit"] = True  # P1 FIX: Флаг явного указания
             entities["long_stay_explicit"] = True
             if "date_from" in entities and "date_to" not in entities:
                 entities["date_to"] = entities["date_from"] + timedelta(days=nights)
@@ -1587,10 +1590,20 @@ async def input_analyzer(state: AgentState) -> AgentState:
     
     # Если cascade_stage > 1 и intent = greeting/search_tour, но есть entities — 
     # это ответ на вопрос, не сброс диалога!
+    # P2 FIX: Добавляем переопределение general_chat → search_tour
+    useful_entity_keys = {"departure_city", "destination_country", "destination_region", 
+                          "destination_resort", "date_from", "adults", "nights", "stars", "food_type"}
+    has_useful_entities = any(k in entities for k in useful_entity_keys)
+    
     if current_cascade_stage > 1 and word_count <= 3:
         if intent == "greeting":
             # Короткий ответ типа "москва" ошибочно определён как greeting
             logger.info(f"   🔄 Переопределяю intent: greeting -> search_tour (середина каскада)")
+            intent = "search_tour"
+        
+        # P2 FIX: general_chat с полезными entities → search_tour
+        if intent == "general_chat" and (has_useful_entities or current_params):
+            logger.info(f"   🔄 P2 FIX: Переопределяю intent: general_chat -> search_tour (середина каскада, есть entities/params)")
             intent = "search_tour"
         
         # Если есть текущие параметры (страна уже известна) — продолжаем сбор
@@ -1609,7 +1622,9 @@ async def input_analyzer(state: AgentState) -> AgentState:
     critical_params_changed = False
     
     for key, value in entities.items():
-        if value is not None:
+        # P3 FIX: Защита от затирания пустой строкой
+        # Пустая строка "" не должна перезаписывать существующие данные
+        if value is not None and value != "":
             old_value = merged_params.get(key)
             
             # Особая обработка дат — новые даты ВСЕГДА заменяют старые
@@ -1743,15 +1758,21 @@ async def input_analyzer(state: AgentState) -> AgentState:
     
     # Автоматический расчёт ночей
     # P6: НЕ пересчитываем если это праздник/выходные — nights уже корректны
+    # P1 FIX: НЕ пересчитываем если nights_explicit=True (пользователь указал явно)
     if "date_from" in merged_params and "date_to" in merged_params:
         d_from = merged_params["date_from"]
         d_to = merged_params["date_to"]
         if isinstance(d_from, date) and isinstance(d_to, date):
             # P6: Праздники и выходные уже имеют корректные nights
-            if merged_params.get("date_precision") not in ("holiday", "weekend"):
+            # P1 FIX: Если nights указан явно — НЕ пересчитываем!
+            nights_explicit = merged_params.get("nights_explicit", False)
+            if merged_params.get("date_precision") not in ("holiday", "weekend") and not nights_explicit:
                 nights = (d_to - d_from).days
                 if nights > 0:
                     merged_params["nights"] = nights
+                    logger.info(f"   📅 Авто-расчёт nights={nights} из дат (nights_explicit=False)")
+            elif nights_explicit:
+                logger.info(f"   🛡️ P1: nights={merged_params.get('nights')} защищён (nights_explicit=True)")
     
     if "date_from" in merged_params and "nights" in merged_params and "date_to" not in merged_params:
         d_from = merged_params["date_from"]
@@ -1880,12 +1901,19 @@ async def general_chat_handler(state: AgentState) -> AgentState:
                 conversation_history=state["messages"]
             )
             if response:
+                # P6 FIX: Capitalize первую букву ответа
+                if response and len(response) > 0 and response[0].islower():
+                    response = response[0].upper() + response[1:]
                 state["response"] = response
                 return state
         except Exception as e:
             print(f"General chat LLM error: {e}")
     
-    state["response"] = generate_fallback_response(user_message, params)
+    fallback_response = generate_fallback_response(user_message, params)
+    # P6 FIX: Capitalize первую букву ответа
+    if fallback_response and len(fallback_response) > 0 and fallback_response[0].islower():
+        fallback_response = fallback_response[0].upper() + fallback_response[1:]
+    state["response"] = fallback_response
     return state
 
 

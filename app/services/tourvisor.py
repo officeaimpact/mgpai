@@ -1910,6 +1910,7 @@ class TourvisorService:
     def _parse_hot_tour(self, tour: dict, departure_city: str = "Москва") -> Optional[TourOffer]:
         """Парсинг горящего тура."""
         
+        
         price = tour.get("price", 0)
         if not price:
             return None
@@ -1939,7 +1940,8 @@ class TourvisorService:
             departure_city=departure_city,  # Используем город из параметра, не из API!
             operator=tour.get("operatorname", ""),
             hotel_link=tour.get("fulldesclink", ""),
-            hotel_photo=tour.get("picturelink", ""),
+            # P4 FIX: для hottours поле называется "hotelpicture", не "picturelink"
+            hotel_photo=tour.get("hotelpicture", ""),
         )
     
     # ==================== 5. АКТУАЛИЗАЦИЯ (actualize.php, actdetail.php) ====================
