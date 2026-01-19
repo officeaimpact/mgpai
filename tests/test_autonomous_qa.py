@@ -20,7 +20,7 @@ from typing import Optional
 
 BASE_URL = "http://localhost:8000"
 PROJECT_ROOT = Path(__file__).parent.parent
-LOG_FILE = PROJECT_ROOT / "debug_bundle" / "LOGS" / "app.jsonl"
+LOG_FILE = PROJECT_ROOT / "app.jsonl"
 
 # Цвета для вывода
 class Colors:

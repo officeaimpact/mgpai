@@ -39,6 +39,7 @@ from app.agent.nodes import (
     quality_check_handler,
     invalid_country_handler,
     child_ages_handler,  # Критическая проверка: дети без возраста
+    clarify_city_handler,  # ЭТАП 1: Уточнение города двойного назначения
     more_tours_handler,  # GAP Analysis: пагинация
     continue_search_handler,  # GAP Analysis: углублённый поиск
     should_search,
@@ -83,6 +84,7 @@ def create_agent_graph() -> StateGraph:
     workflow.add_node("quality_check_handler", quality_check_handler)
     workflow.add_node("invalid_country_handler", invalid_country_handler)
     workflow.add_node("child_ages_handler", child_ages_handler)  # КРИТИЧНО: дети без возраста
+    workflow.add_node("clarify_city_handler", clarify_city_handler)  # ЭТАП 1: Уточнение города
     workflow.add_node("more_tours_handler", more_tours_handler)  # GAP Analysis: пагинация
     workflow.add_node("continue_search_handler", continue_search_handler)  # GAP Analysis: углублённый поиск
     workflow.add_node("responder", responder)
@@ -102,6 +104,7 @@ def create_agent_graph() -> StateGraph:
             "general_chat": "general_chat_handler",        # Общий вопрос — отвечаем + мягко собираем
             "invalid_country": "invalid_country_handler",  # Невалидная страна
             "ask_child_ages": "child_ages_handler",        # КРИТИЧНО: дети без возраста
+            "clarify_city": "clarify_city_handler",        # ЭТАП 1: Уточнение города двойного назначения
             "more_tours": "more_tours_handler",            # GAP Analysis: пагинация
             "continue_search": "continue_search_handler",  # GAP Analysis: углублённый поиск
             "ask": "responder"                             # Нужны базовые уточнения — спрашиваем
@@ -128,6 +131,9 @@ def create_agent_graph() -> StateGraph:
     
     # После child_ages_handler — завершаем (ждём возраст детей)
     workflow.add_edge("child_ages_handler", END)
+    
+    # После clarify_city_handler — завершаем (ждём уточнение города)
+    workflow.add_edge("clarify_city_handler", END)
     
     # После more_tours_handler — завершаем (пагинация)
     workflow.add_edge("more_tours_handler", END)

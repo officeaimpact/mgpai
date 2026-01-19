@@ -350,6 +350,78 @@ DEPARTURE_CITIES = {
     "калининград": "Калининград",
 }
 
+# ==================== ЭТАП 1: ГОРОДА ДВОЙНОГО НАЗНАЧЕНИЯ ====================
+# Города, которые могут быть И вылетом, И направлением отдыха
+DUAL_PURPOSE_CITIES = {
+    "сочи", "анапа", "геленджик", "калининград", 
+    "симферополь", "минеральные воды", "минводы"
+}
+
+
+def resolve_dual_city_context(text: str, city: str, last_question_type: str = None) -> str:
+    """
+    Определяет, является ли город вылетом или направлением.
+    
+    Args:
+        text: Полный текст пользователя
+        city: Название города (нормализованное, lowercase)
+        last_question_type: Тип последнего вопроса бота
+    
+    Returns:
+        'departure' — город вылета
+        'destination' — направление отдыха
+        'ambiguous' — неясно, нужно уточнить
+    """
+    text_lower = text.lower()
+    city_lower = city.lower()
+    
+    # Явные маркеры вылета
+    departure_markers = [
+        f"из {city_lower}",
+        f"вылет из {city_lower}",
+        f"вылет {city_lower}",
+        f"летим из {city_lower}",
+        f"лететь из {city_lower}",
+        f"с {city_lower}",  # "с Сочи" (разговорное)
+        f"вылетаем из {city_lower}",
+        f"вылетаю из {city_lower}",
+    ]
+    
+    # Явные маркеры направления
+    destination_markers = [
+        f"в {city_lower}",
+        f"хочу в {city_lower}",
+        f"отдохнуть в {city_lower}",
+        f"поехать в {city_lower}",
+        f"поеду в {city_lower}",
+        f"отпуск в {city_lower}",
+        f"на море в {city_lower}",
+        f"слетать в {city_lower}",
+        f"тур в {city_lower}",
+    ]
+    
+    for marker in departure_markers:
+        if marker in text_lower:
+            logger.info(f"   🚀 DUAL_CITY: '{city}' определён как ВЫЛЕТ (маркер: '{marker}')")
+            return 'departure'
+    
+    for marker in destination_markers:
+        if marker in text_lower:
+            logger.info(f"   🏖️ DUAL_CITY: '{city}' определён как НАПРАВЛЕНИЕ (маркер: '{marker}')")
+            return 'destination'
+    
+    # Контекст из предыдущего вопроса бота
+    if last_question_type == "departure_city":
+        logger.info(f"   🚀 DUAL_CITY: '{city}' определён как ВЫЛЕТ (ответ на вопрос 'откуда?')")
+        return 'departure'
+    if last_question_type in ["destination", "destination_country"]:
+        logger.info(f"   🏖️ DUAL_CITY: '{city}' определён как НАПРАВЛЕНИЕ (ответ на вопрос 'куда?')")
+        return 'destination'
+    
+    # Если город упоминается без контекста — неясно
+    logger.info(f"   ❓ DUAL_CITY: '{city}' — контекст неясен, требуется уточнение")
+    return 'ambiguous'
+
 
 def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
     """
@@ -419,23 +491,68 @@ def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
     else:
         logger.info(f"   🛡️ P4: Защита destination — last_question_type='departure_city', пропускаем парсинг страны")
     
-    # 2. Курорт
-    # P4 FIX: Пропускаем если защищаем destination от перезаписи
-    if not protect_destination:
+    # 2. Курорт + 3. Город вылета (ОБЪЕДИНЁННАЯ ЛОГИКА С DUAL_PURPOSE_CITIES)
+    # ==================== ЭТАП 1: Умный парсинг городов двойного назначения ====================
+    
+    # Сначала проверяем города двойного назначения
+    dual_city_found = None
+    dual_city_key = None
+    for key in DUAL_PURPOSE_CITIES:
+        if key in text_lower:
+            dual_city_found = key
+            dual_city_key = key
+            break
+    
+    if dual_city_found:
+        # Определяем контекст: вылет или направление?
+        context = resolve_dual_city_context(text, dual_city_found, last_question_type)
+        
+        if context == 'departure':
+            # Это город ВЫЛЕТА
+            normalized_city = DEPARTURE_CITIES.get(dual_city_key, dual_city_found.title())
+            entities["departure_city"] = normalized_city
+            logger.info(f"   ✈️ DUAL_CITY → departure_city: '{normalized_city}'")
+        elif context == 'destination':
+            # Это НАПРАВЛЕНИЕ отдыха
+            if not protect_destination:
+                if dual_city_key in RESORTS_MAP:
+                    country, resort = RESORTS_MAP[dual_city_key]
+                    entities["destination_country"] = country
+                    entities["destination_resort"] = resort
+                    logger.info(f"   🏖️ DUAL_CITY → destination: '{country}', resort: '{resort}'")
+                else:
+                    # Город не в RESORTS_MAP, но это направление
+                    entities["destination_region"] = dual_city_found.title()
+                    logger.info(f"   🏖️ DUAL_CITY → destination_region: '{dual_city_found.title()}'")
+        else:
+            # Контекст неясен — записываем как ambiguous для уточнения
+            entities["ambiguous_city"] = dual_city_found.title()
+            logger.info(f"   ❓ DUAL_CITY → ambiguous_city: '{dual_city_found.title()}' (нужно уточнение)")
+    
+    # Обычные курорты (НЕ dual-purpose)
+    if not protect_destination and not dual_city_found:
         for key, (country, resort) in RESORTS_MAP.items():
+            # Пропускаем dual-purpose города — они обработаны выше
+            if key in DUAL_PURPOSE_CITIES:
+                continue
             if key in text_lower:
                 entities["destination_country"] = country
                 entities["destination_resort"] = resort
+                logger.info(f"   🏨 Курорт найден: '{resort}' ({country})")
                 break
-    else:
-        # Но город вылета всё равно парсим!
+    elif protect_destination:
         logger.info(f"   🛡️ P4: Защита destination_resort — пропускаем парсинг курорта")
     
-    # 3. Город вылета (ВАЖНО!)
-    for key, city in DEPARTURE_CITIES.items():
-        if key in text_lower:
-            entities["departure_city"] = city
-            break
+    # Обычные города вылета (НЕ dual-purpose)
+    if not dual_city_found:
+        for key, city in DEPARTURE_CITIES.items():
+            # Пропускаем dual-purpose города — они обработаны выше
+            if key in DUAL_PURPOSE_CITIES:
+                continue
+            if key in text_lower:
+                entities["departure_city"] = city
+                logger.info(f"   ✈️ Город вылета найден: '{city}'")
+                break
     
     # 4. Даты
     months_map = {
@@ -655,14 +772,36 @@ def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
                 entities["date_to"] = entities["date_from"] + timedelta(days=nights)
         # Если > 30 — игнорируем (скорее всего ошибка/галлюцинация)
     
+    # ==================== ЭТАП 2: ПАТТЕРН N+M (взрослые + дети) ====================
+    # Формат: "2+1", "4+4", "3+2" — первое число = взрослые, второе = дети
+    # ВАЖНО: Это НЕ возраст детей, а количество! Возраст нужно будет уточнить.
+    plus_pattern_match = re.search(r'(\d)\s*\+\s*(\d)', text_lower)
+    if plus_pattern_match:
+        adults_from_plus = int(plus_pattern_match.group(1))
+        children_from_plus = int(plus_pattern_match.group(2))
+        
+        if 1 <= adults_from_plus <= 6:
+            entities["adults"] = adults_from_plus
+            entities["adults_explicit"] = True
+            logger.info(f"   ➕ PLUS_PATTERN: {adults_from_plus}+{children_from_plus} → adults={adults_from_plus}")
+        
+        if children_from_plus > 0:
+            # Помечаем что есть дети, но возраст неизвестен — нужно спросить!
+            entities["children_mentioned"] = True
+            entities["children_count_mentioned"] = children_from_plus
+            logger.info(f"   ➕ PLUS_PATTERN: {children_from_plus} детей (возраст не указан, нужно уточнить)")
+    
     # 6. Количество взрослых
     # ВАЖНО: Извлекаем даже если > 6 (для эскалации групповых заявок)
-    adults_match = re.search(r'(\d+)\s*(?:взросл|человек|чел\.)', text_lower)
-    if adults_match:
-        adults = int(adults_match.group(1))
-        if 1 <= adults <= 20:  # Разрешаем до 20 для групп
-            entities["adults"] = adults
-            entities["adults_explicit"] = True  # ЯВНО указано пользователем!
+    # ЭТАП 2: Добавлено "взр\." — сокращение "взр."
+    # Пропускаем если уже извлечено из PLUS_PATTERN
+    if "adults" not in entities:
+        adults_match = re.search(r'(\d+)\s*(?:взросл|человек|чел\.|взр\.)', text_lower)
+        if adults_match:
+            adults = int(adults_match.group(1))
+            if 1 <= adults <= 20:  # Разрешаем до 20 для групп
+                entities["adults"] = adults
+                entities["adults_explicit"] = True  # ЯВНО указано пользователем!
     
     # Слова для количества (только если не нашли число)
     if "adults" not in entities:
@@ -792,6 +931,23 @@ def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
             entities["stars"] = stars
             entities["stars_explicit"] = True  # P1: ЯВНО указано!
             entities["stars_updated"] = True  # Флаг: обновлено в текущем шаге
+    
+    # ЭТАП 3: Словесные паттерны звёздности ("пятерка", "четверка", "тройка")
+    if "stars" not in entities:
+        stars_word_patterns = [
+            # 5 звёзд: пятерка, пятёрку, люкс
+            (r'пят[её]рк[уаи]?|пятизвёзд|пятизвезд|люкс\b', 5),
+            # 4 звезды: четверка, четвёрку
+            (r'четв[её]рк[уаи]?|четырёхзвёзд|четырехзвезд', 4),
+            # 3 звезды: тройка, тройку
+            (r'тройк[уаи]?|трёхзвёзд|трехзвезд', 3),
+        ]
+        for pattern, star_value in stars_word_patterns:
+            if re.search(pattern, text_lower):
+                entities["stars"] = star_value
+                entities["stars_explicit"] = True
+                entities["stars_updated"] = True
+                break
     
     # 10. Название отеля (поиск по известным)
     # КРИТИЧНО: НЕ определяем страну по бренду отеля!
@@ -1084,6 +1240,13 @@ async def extract_entities_with_llm(text: str, awaiting_phone: bool = False, las
                 logger.info(f"   🛡️ P6: Защита даты ({date_precision}) — LLM не перезаписывает {key}")
                 continue
             
+            # ЭТАП 2 FIX: НЕ перезаписываем children если был PLUS_PATTERN (2+1)
+            # LLM интерпретирует "2+1" как "ребёнок 1 года" — это НЕВЕРНО!
+            # Если regex обнаружил children_mentioned (из PLUS_PATTERN) — возраст не указан!
+            if key == "children" and regex_entities.get("children_mentioned"):
+                logger.info(f"   🛡️ ЭТАП2: PLUS_PATTERN активен — LLM не перезаписывает children (возраст не указан!)")
+                continue
+            
             final_entities[key] = value
     
     intent = llm_intent if llm_intent else regex_intent
@@ -1321,6 +1484,62 @@ async def input_analyzer(state: AgentState) -> AgentState:
         logger.info("   📅 P1: '2 недели' → nights=14")
         return state
     
+    # ==================== ЭТАП 1: ОБРАБОТКА ОТВЕТА НА CLARIFY_CITY ====================
+    # Если спрашивали "из Сочи или в Сочи?" — интерпретируем ответ
+    if last_question == "clarify_city":
+        current_params = state["search_params"].copy() if state["search_params"] else {}
+        ambiguous_city = state.get("ambiguous_city", "")
+        user_lower = user_text.lower()
+        
+        # Проверяем маркеры вылета
+        departure_markers = ["из", "вылет", "вылетаю", "вылетаем", "улет", "отсюда"]
+        is_departure = any(marker in user_lower for marker in departure_markers)
+        
+        # Проверяем маркеры направления
+        destination_markers = ["в", "туда", "отдохн", "отпуск", "направлен", "поехать", "поеду"]
+        is_destination = any(marker in user_lower for marker in destination_markers)
+        
+        if is_departure and not is_destination:
+            # Это город ВЫЛЕТА
+            normalized_city = DEPARTURE_CITIES.get(ambiguous_city.lower(), ambiguous_city)
+            current_params["departure_city"] = normalized_city
+            state["search_params"] = current_params
+            state["last_question_type"] = None
+            state["ambiguous_city"] = None
+            logger.info(f"   ✈️ CLARIFY_CITY: '{ambiguous_city}' → departure_city")
+            
+            missing = get_missing_required_params(current_params)
+            cascade_stage = get_cascade_stage(current_params, state.get("search_mode", "package"))
+            state["missing_info"] = missing
+            state["intent"] = "search_tour"
+            state["cascade_stage"] = cascade_stage
+            return state
+        
+        elif is_destination and not is_departure:
+            # Это НАПРАВЛЕНИЕ отдыха
+            city_lower = ambiguous_city.lower()
+            if city_lower in RESORTS_MAP:
+                country, resort = RESORTS_MAP[city_lower]
+                current_params["destination_country"] = country
+                current_params["destination_resort"] = resort
+            else:
+                current_params["destination_region"] = ambiguous_city
+            
+            state["search_params"] = current_params
+            state["last_question_type"] = None
+            state["ambiguous_city"] = None
+            logger.info(f"   🏖️ CLARIFY_CITY: '{ambiguous_city}' → destination")
+            
+            missing = get_missing_required_params(current_params)
+            cascade_stage = get_cascade_stage(current_params, state.get("search_mode", "package"))
+            state["missing_info"] = missing
+            state["intent"] = "search_tour"
+            state["cascade_stage"] = cascade_stage
+            return state
+        
+        # Если всё ещё неясно — пусть extract_entities_regex разберётся
+        logger.info(f"   ❓ CLARIFY_CITY: Ответ неясен, пробуем extract_entities_regex")
+    
     # ==================== ОБРАБОТКА ОТВЕТА НА CHILDREN_CHECK ====================
     # Если спрашивали "поедут ли дети?" и пользователь ответил "нет"/"без детей"
     if last_question == "children_check":
@@ -1433,6 +1652,16 @@ async def input_analyzer(state: AgentState) -> AgentState:
             state["skip_quality_check"] = False  # RESET FLAGS: для новой страны заново спросим про звёзды
             merged_params["skip_quality_check"] = False  # Также в параметрах
             logger.info(f"   🔄 Смена страны: {merged_params.get('destination_country')} → сброс ВСЕХ флагов качества")
+    
+    # ==================== ЭТАП 1: ОБРАБОТКА НЕЯСНОГО ГОРОДА (ambiguous_city) ====================
+    # Если город двойного назначения (Сочи/Анапа) упомянут без контекста — уточняем
+    ambiguous_city = entities.get("ambiguous_city")
+    if ambiguous_city:
+        state["search_params"] = merged_params
+        state["intent"] = "clarify_city"
+        state["ambiguous_city"] = ambiguous_city
+        logger.info(f"   ❓ Требуется уточнение города: '{ambiguous_city}' — вылет или направление?")
+        return state
     
     # ==================== КРИТИЧЕСКАЯ ПРОВЕРКА: ДЕТИ БЕЗ ВОЗРАСТА ====================
     # Если упомянуты дети, но возраст НЕ указан — БЛОКИРУЕМ поиск и спрашиваем
@@ -1738,7 +1967,8 @@ async def tour_searcher(state: AgentState) -> AgentState:
             tours = await tourvisor_service.get_hot_tours(
                 departure_id=departure_id,
                 country_id=country_id,
-                limit=10  # P1: увеличиваем лимит для лучшего выбора
+                limit=10,  # P1: увеличиваем лимит для лучшего выбора
+                departure_city=departure_city  # Для отображения в карточках
             )
             
             state["tour_offers"] = tours
@@ -2231,15 +2461,11 @@ async def responder(state: AgentState) -> AgentState:
             # Сбрасываем флаг
             state["date_warning"] = False
         
-        # Добавляем предупреждение о сезоне (мягкое, одной фразой)
-        season_warning = ""
-        if date_from and country and not state.get("smart_alternatives"):
-            month = date_from.month
-            off_season, _ = is_off_season(country, month)
-            if off_season and country == "Турция":
-                season_warning = "\n(Обратите внимание: в этот период море прохладное для купания.)"
+        # ЭТАП 4: Убраны непрошенные рекомендации о сезоне
+        # Клиент не просил совета о погоде — не даём лишнюю информацию
+        # (было: предупреждение "море прохладное для купания")
         
-        state["response"] = header + date_warning + season_warning
+        state["response"] = header + date_warning
         # Сбрасываем флаги ожидания
         state["awaiting_agreement"] = False
         state["pending_action"] = None
@@ -2598,10 +2824,15 @@ async def continue_search_handler(state: AgentState) -> AgentState:
         )
         return state
     
+    # Получаем город вылета из параметров
+    params = state.get("search_params", {})
+    departure_city = params.get("departure_city", "Москва")
+    
     try:
         offers, has_more = await tourvisor_service.continue_search(
             request_id=search_id,
-            country_id=country_id or 1
+            country_id=country_id or 1,
+            departure_city=departure_city
         )
         
         if offers:
@@ -2662,12 +2893,17 @@ async def more_tours_handler(state: AgentState) -> AgentState:
     # Загружаем следующую страницу
     next_page = current_page + 1
     
+    # Получаем город вылета из параметров
+    params = state.get("search_params", {})
+    departure_city = params.get("departure_city", "Москва")
+    
     try:
         offers = await tourvisor_service.fetch_more_results(
             request_id=search_id,
             country_id=country_id or 1,
             page=next_page,
-            onpage=5
+            onpage=5,
+            departure_city=departure_city
         )
         
         if offers:
@@ -2708,6 +2944,27 @@ async def more_tours_handler(state: AgentState) -> AgentState:
     return state
 
 
+# ==================== ЭТАП 1: ОБРАБОТЧИК УТОЧНЕНИЯ ГОРОДА ====================
+async def clarify_city_handler(state: AgentState) -> AgentState:
+    """
+    Обработчик для уточнения города двойного назначения.
+    
+    Если пользователь написал "Сочи" без контекста, спрашиваем:
+    вылетаете из Сочи или хотите отдохнуть в Сочи?
+    """
+    ambiguous_city = state.get("ambiguous_city", "город")
+    
+    question = (
+        f"Уточните, пожалуйста: вы хотите вылететь **из {ambiguous_city}** "
+        f"или поехать отдыхать **в {ambiguous_city}**?"
+    )
+    
+    state["response"] = question
+    state["last_question_type"] = "clarify_city"
+    logger.info(f"   ❓ CLARIFY_CITY: Спрашиваем про '{ambiguous_city}'")
+    return state
+
+
 async def child_ages_handler(state: AgentState) -> AgentState:
     """
     Обработчик запроса возраста детей.
@@ -2735,6 +2992,10 @@ def should_search(state: AgentState) -> str:
     """Определение следующего узла."""
     intent = state.get("intent", "search_tour")
     params = state.get("search_params", {})
+    
+    # ==================== ЭТАП 1: УТОЧНЕНИЕ ГОРОДА (DUAL_PURPOSE_CITIES) ====================
+    if intent == "clarify_city":
+        return "clarify_city"
     
     # ==================== КРИТИЧЕСКАЯ ПРОВЕРКА: ДЕТИ БЕЗ ВОЗРАСТА ====================
     if intent == "ask_child_ages":

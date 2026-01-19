@@ -1231,7 +1231,8 @@ class TourvisorService:
             
             # === STEP 2: Цикл опроса статуса ===
             offers = await self._poll_and_fetch_results(
-                request_id, country_id, is_strict_hotel_search, hotel_ids
+                request_id, country_id, is_strict_hotel_search, hotel_ids,
+                departure_city=params.departure_city or "Москва"
             )
             
             # ==================== СТРОГАЯ ФИЛЬТРАЦИЯ ПО ЗВЁЗДАМ ====================
@@ -1465,7 +1466,8 @@ class TourvisorService:
         country_id: int,
         is_strict_hotel_search: bool,
         hotel_ids: Optional[list[int]],
-        onpage: int = 100  # УВЕЛИЧЕНО: запрашиваем 100 отелей для глубокой выборки
+        onpage: int = 100,  # УВЕЛИЧЕНО: запрашиваем 100 отелей для глубокой выборки
+        departure_city: str = "Москва"  # Город вылета для карточек
     ) -> list[TourOffer]:
         """
         Цикл опроса статуса и получения результатов.
@@ -1505,7 +1507,7 @@ class TourvisorService:
             if status.state == "finished":
                 final_offers = await self._fetch_results(
                     request_id, country_id, is_strict_hotel_search, hotel_ids,
-                    onpage=onpage
+                    onpage=onpage, departure_city=departure_city
                 )
                 if final_offers:
                     all_offers = final_offers
@@ -1517,7 +1519,7 @@ class TourvisorService:
             if status.progress >= self.min_progress_to_fetch and not fetched:
                 offers = await self._fetch_results(
                     request_id, country_id, is_strict_hotel_search, hotel_ids,
-                    onpage=onpage
+                    onpage=onpage, departure_city=departure_city
                 )
                 if offers:
                     all_offers = offers
@@ -1564,7 +1566,8 @@ class TourvisorService:
         is_strict_hotel_search: bool,
         hotel_ids: Optional[list[int]],
         page: int = 1,
-        onpage: int = 100  # CRITICAL: 100 для глубокой выборки (Source 216)
+        onpage: int = 100,  # CRITICAL: 100 для глубокой выборки (Source 216)
+        departure_city: str = "Москва"  # Город вылета для карточек
     ) -> list[TourOffer]:
         """
         Получение результатов поиска с поддержкой пагинации.
@@ -1579,6 +1582,7 @@ class TourvisorService:
             hotel_ids: Список ID отелей
             page: Номер страницы (начиная с 1)
             onpage: Количество отелей на странице (100 для глубокой выборки)
+            departure_city: Город вылета из SearchRequest (для карточек)
         """
         try:
             response = await self._request("result.php", {
@@ -1589,7 +1593,7 @@ class TourvisorService:
             })
             
             return self._parse_tour_results(
-                response, country_id, is_strict_hotel_search, hotel_ids
+                response, country_id, is_strict_hotel_search, hotel_ids, departure_city
             )
         except Exception as e:
             logger.error(f"❌ Ошибка получения результатов: {e}")
@@ -1600,7 +1604,8 @@ class TourvisorService:
         request_id: str,
         country_id: int,
         page: int = 2,
-        onpage: int = 100  # Глубокая выборка
+        onpage: int = 100,  # Глубокая выборка
+        departure_city: str = "Москва"  # Город вылета для карточек
     ) -> list[TourOffer]:
         """
         Получение дополнительных результатов (пагинация).
@@ -1612,6 +1617,7 @@ class TourvisorService:
             country_id: ID страны
             page: Номер страницы (2, 3, 4...)
             onpage: Количество отелей на странице (100 для глубокой выборки)
+            departure_city: Город вылета (для отображения в карточках)
             
         Returns:
             Список дополнительных туров
@@ -1624,13 +1630,15 @@ class TourvisorService:
             is_strict_hotel_search=False,
             hotel_ids=None,
             page=page,
-            onpage=onpage
+            onpage=onpage,
+            departure_city=departure_city
         )
     
     async def continue_search(
         self,
         request_id: str,
-        country_id: int
+        country_id: int,
+        departure_city: str = "Москва"  # Город вылета для карточек
     ) -> tuple[list[TourOffer], bool]:
         """
         Продолжение поиска для получения более полных результатов.
@@ -1644,6 +1652,7 @@ class TourvisorService:
         Args:
             request_id: ID предыдущего поискового запроса
             country_id: ID страны
+            departure_city: Город вылета (для отображения в карточках)
             
         Returns:
             Tuple (список туров, есть ли ещё результаты)
@@ -1665,7 +1674,8 @@ class TourvisorService:
                 country_id=country_id,
                 is_strict_hotel_search=False,
                 hotel_ids=None,
-                onpage=100  # Глубокая выборка
+                onpage=100,  # Глубокая выборка
+                departure_city=departure_city
             )
             
             # Сортируем и берём СТРОГО 5 туров (лимит Pydantic!)
@@ -1693,9 +1703,14 @@ class TourvisorService:
         response: dict,
         country_id: int,
         is_strict_hotel_search: bool,
-        hotel_ids: Optional[list[int]]
+        hotel_ids: Optional[list[int]],
+        departure_city: str = "Москва"
     ) -> list[TourOffer]:
-        """Парсинг результатов поиска."""
+        """Парсинг результатов поиска.
+        
+        Args:
+            departure_city: Город вылета из SearchRequest (для карточек)
+        """
         
         hotels_data = response.get("data", {}).get("result", {}).get("hotel", [])
         
@@ -1721,7 +1736,7 @@ class TourvisorService:
                     continue
             
             try:
-                offer = self._parse_single_offer(hotel, expected_country)
+                offer = self._parse_single_offer(hotel, expected_country, departure_city)
                 if offer:
                     offers.append(offer)
             except Exception as e:
@@ -1730,8 +1745,14 @@ class TourvisorService:
         
         return offers
     
-    def _parse_single_offer(self, hotel: dict, country_name: Optional[str]) -> Optional[TourOffer]:
-        """Парсинг одного предложения."""
+    def _parse_single_offer(self, hotel: dict, country_name: Optional[str], departure_city: str = "Москва") -> Optional[TourOffer]:
+        """Парсинг одного предложения.
+        
+        Args:
+            hotel: Данные отеля из API
+            country_name: Название страны
+            departure_city: Город вылета из SearchRequest (не из API!)
+        """
         
         tours = hotel.get("tours", {}).get("tour", [])
         if isinstance(tours, dict):
@@ -1782,7 +1803,7 @@ class TourvisorService:
             nights=nights,
             adults=int(tour.get("adults", 2)),
             children=int(tour.get("child", 0)),
-            departure_city=tour.get("departurename", "Москва"),
+            departure_city=departure_city,  # Используем город из SearchRequest, не из API!
             operator=tour.get("operatorname", ""),
             hotel_link=hotel.get("fulldesclink", ""),
             hotel_photo=hotel.get("picturelink", ""),
@@ -1830,7 +1851,8 @@ class TourvisorService:
         self,
         departure_id: int = 1,
         country_id: Optional[int] = None,
-        limit: int = 10
+        limit: int = 10,
+        departure_city: str = "Москва"  # Город вылета для карточек
     ) -> list[TourOffer]:
         """
         Получение горящих туров.
@@ -1842,6 +1864,7 @@ class TourvisorService:
         - city: ID города вылета
         - country: ID страны (опционально)
         - items: количество результатов
+        - departure_city: Название города вылета (для отображения в карточках)
         """
         logger.info("🔥 Получение горящих туров...")
         
@@ -1871,7 +1894,7 @@ class TourvisorService:
             offers = []
             for t in tours_data:
                 try:
-                    offer = self._parse_hot_tour(t)
+                    offer = self._parse_hot_tour(t, departure_city)
                     if offer:
                         offers.append(offer)
                 except Exception:
@@ -1884,7 +1907,7 @@ class TourvisorService:
             logger.error(f"❌ Ошибка получения горящих туров: {e}")
             return []
     
-    def _parse_hot_tour(self, tour: dict) -> Optional[TourOffer]:
+    def _parse_hot_tour(self, tour: dict, departure_city: str = "Москва") -> Optional[TourOffer]:
         """Парсинг горящего тура."""
         
         price = tour.get("price", 0)
@@ -1913,7 +1936,7 @@ class TourvisorService:
             nights=nights,
             adults=2,
             children=0,
-            departure_city=tour.get("departurename", "Москва"),
+            departure_city=departure_city,  # Используем город из параметра, не из API!
             operator=tour.get("operatorname", ""),
             hotel_link=tour.get("fulldesclink", ""),
             hotel_photo=tour.get("picturelink", ""),
