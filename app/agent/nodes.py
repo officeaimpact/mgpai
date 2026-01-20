@@ -718,6 +718,25 @@ def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
         
         # "dd месяца" — R1 FIX: используем все варианты из months_map включая опечатки
         months_regex = '|'.join(re.escape(m) for m in months_map.keys())
+        
+        # FIX 4: Добавляем паттерны для смены даты "лучше/давайте dd месяца"
+        date_override_pattern = rf'(?:лучше|давайте|давай)\s+(\d{{1,2}})\s+({months_regex})'
+        for match in re.finditer(date_override_pattern, text_lower):
+            day = int(match.group(1))
+            month_key = match.group(2)
+            if month_key in months_map:
+                month = months_map[month_key]
+                year = today.year
+                try:
+                    d = date(year, month, day)
+                    if d < today:
+                        d = date(year + 1, month, day)
+                    dates_found.append(d)
+                    logger.info(f"   📅 FIX 4: Смена даты '{match.group(0)}' → {d}")
+                except ValueError:
+                    pass
+        
+        # Стандартный паттерн "dd месяца"
         for match in re.finditer(rf'(\d{{1,2}})\s+({months_regex})', text_lower):
             day = int(match.group(1))
             month_key = match.group(2)
@@ -848,6 +867,7 @@ def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
             r'(\d+)\s*дн(?:ей|я|ь)',      # "10 дней", "5 дня", "1 день"
             r'дн(?:ей|я)\s*(\d+)',         # "дней 10"
             r'на\s*(\d+)\s*дн',            # "на 10 дней"
+            r'дн(?:ей|я)\s*на\s*(\d+)',   # "дней на 10" ← FIX 1
         ]
         for pattern in days_patterns:
             days_match = re.search(pattern, text_lower)
@@ -1013,11 +1033,20 @@ def extract_entities_regex(text: str, last_question_type: str = None) -> dict:
         entities["children_mentioned"] = True
         entities["children_count_mentioned"] = 1
     
-    # "мы с мужем/женой" → adults=2
-    if re.search(r'мы\s+с\s+(?:муж|жен|супруг)', text_lower):
-        if "adults" not in entities:
-            entities["adults"] = 2
-            entities["adults_explicit"] = True
+    # FIX 3: "с мужем/женой" → adults=2 (расширенный паттерн)
+    # Покрывает: "мы с мужем", "с мужем", "хотим с мужем", "едем с женой", "с супругом"
+    family_patterns = [
+        r'мы\s+с\s+(?:муж|жен|супруг)',   # "мы с мужем"
+        r'(?:хотим|едем|летим|поедем)\s+с\s+(?:муж|жен|супруг)',  # "хотим с мужем"
+        r'(?:^|\s)с\s+(?:мужем|женой|супругом|супругой)(?:\s|$|,)',  # "с мужем" в начале/середине
+    ]
+    for pattern in family_patterns:
+        if re.search(pattern, text_lower):
+            if "adults" not in entities:
+                entities["adults"] = 2
+                entities["adults_explicit"] = True
+                logger.info(f"   👫 FIX 3: Распознано 'с мужем/женой' → adults=2")
+                break
     
     # 8. Тип питания
     # P1 FIX: Проверяем UAI ПЕРЕД AI (иначе "ультра всё включено" даст AI)
@@ -1898,6 +1927,14 @@ async def input_analyzer(state: AgentState) -> AgentState:
     
     state["search_params"] = merged_params
     state["missing_info"] = missing
+    
+    # FIX 2: Сохраняем hot_tours если был установлен ранее
+    # Проблема: при ответе "москва" на горящие туры, intent менялся на search_tour/greeting
+    previous_intent = state.get("intent")
+    if previous_intent == "hot_tours" and intent in ("search_tour", "greeting", "general_chat"):
+        logger.info(f"   🔥 FIX 2: Сохраняем intent=hot_tours (было {intent})")
+        intent = "hot_tours"
+    
     state["intent"] = intent
     state["cascade_stage"] = cascade_stage
     state["is_first_message"] = is_first
