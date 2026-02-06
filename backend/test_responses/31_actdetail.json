@@ -1,0 +1,553 @@
+{
+  "flights": [
+    {
+      "forward": [
+        {
+          "number": "DP839",
+          "company": {
+            "id": "DP",
+            "name": "Победа",
+            "thumb": "https://tourvisor.ru/pics/aircompany/DP.gif",
+            "logo": "https://tourvisor.ru/pics/aircompany/DP.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "14.02.2026",
+            "time": "07:05",
+            "port": {
+              "id": "VKO",
+              "name": "Москва, Внуково ",
+              "shortName": "Внуково",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "14.02.2026",
+            "time": "12:00",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "backward": [
+        {
+          "number": "DP860",
+          "company": {
+            "id": "DP",
+            "name": "Победа",
+            "thumb": "https://tourvisor.ru/pics/aircompany/DP.gif",
+            "logo": "https://tourvisor.ru/pics/aircompany/DP.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "21.02.2026",
+            "time": "12:35",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "21.02.2026",
+            "time": "17:25",
+            "port": {
+              "id": "VKO",
+              "name": "Москва, Внуково ",
+              "shortName": "Внуково",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "dateforward": "14.02.2026",
+      "datebackward": "21.02.2026",
+      "price": {
+        "value": 73910,
+        "currency": "RUB"
+      },
+      "fuelcharge": {
+        "value": 0,
+        "currency": "RUB"
+      },
+      "isdefault": true
+    },
+    {
+      "forward": [
+        {
+          "number": "PC1577",
+          "company": {
+            "id": "PC",
+            "name": "Pegasus Airlines",
+            "thumb": "https://tourvisor.ru/pics/aircompany/PC.gif",
+            "logo": "https://tourvisor.ru/pics/aircompany/PC.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "14.02.2026",
+            "time": "04:10",
+            "port": {
+              "id": "VKO",
+              "name": "Москва, Внуково ",
+              "shortName": "Внуково",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "14.02.2026",
+            "time": "08:45",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "backward": [
+        {
+          "number": "DP860",
+          "company": {
+            "id": "DP",
+            "name": "Победа",
+            "thumb": "https://tourvisor.ru/pics/aircompany/DP.gif",
+            "logo": "https://tourvisor.ru/pics/aircompany/DP.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "21.02.2026",
+            "time": "12:35",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "21.02.2026",
+            "time": "17:25",
+            "port": {
+              "id": "VKO",
+              "name": "Москва, Внуково ",
+              "shortName": "Внуково",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "dateforward": "14.02.2026",
+      "datebackward": "21.02.2026",
+      "price": {
+        "value": 87272,
+        "currency": "RUB"
+      },
+      "fuelcharge": {
+        "value": 0,
+        "currency": "RUB"
+      },
+      "isdefault": false
+    },
+    {
+      "forward": [
+        {
+          "number": "DP839",
+          "company": {
+            "id": "DP",
+            "name": "Победа",
+            "thumb": "https://tourvisor.ru/pics/aircompany/DP.gif",
+            "logo": "https://tourvisor.ru/pics/aircompany/DP.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "14.02.2026",
+            "time": "07:05",
+            "port": {
+              "id": "VKO",
+              "name": "Москва, Внуково ",
+              "shortName": "Внуково",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "14.02.2026",
+            "time": "12:00",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "backward": [
+        {
+          "number": "PC1576",
+          "company": {
+            "id": "PC",
+            "name": "Pegasus Airlines",
+            "thumb": "https://tourvisor.ru/pics/aircompany/PC.gif",
+            "logo": "https://tourvisor.ru/pics/aircompany/PC.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "21.02.2026",
+            "time": "22:15",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "22.02.2026",
+            "time": "02:50 +1",
+            "port": {
+              "id": "VKO",
+              "name": "Москва, Внуково ",
+              "shortName": "Внуково",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "dateforward": "14.02.2026",
+      "datebackward": "21.02.2026",
+      "price": {
+        "value": 87552,
+        "currency": "RUB"
+      },
+      "fuelcharge": {
+        "value": 0,
+        "currency": "RUB"
+      },
+      "isdefault": false
+    },
+    {
+      "forward": [
+        {
+          "number": "DP839",
+          "company": {
+            "id": "DP",
+            "name": "Победа",
+            "thumb": "https://tourvisor.ru/pics/aircompany/DP.gif",
+            "logo": "https://tourvisor.ru/pics/aircompany/DP.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "14.02.2026",
+            "time": "07:05",
+            "port": {
+              "id": "VKO",
+              "name": "Москва, Внуково ",
+              "shortName": "Внуково",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "14.02.2026",
+            "time": "12:00",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "backward": [
+        {
+          "number": "2S001",
+          "company": {
+            "id": "2S",
+            "name": "Southwind",
+            "thumb": null,
+            "logo": "https://tourvisor.ru/pics/aircompany/2S.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "21.02.2026",
+            "time": "07:25",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "21.02.2026",
+            "time": "11:45",
+            "port": {
+              "id": "SVO",
+              "name": "Москва Шереметьево",
+              "shortName": "Шереметьево",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "dateforward": "14.02.2026",
+      "datebackward": "21.02.2026",
+      "price": {
+        "value": 89888,
+        "currency": "RUB"
+      },
+      "fuelcharge": {
+        "value": 0,
+        "currency": "RUB"
+      },
+      "isdefault": false
+    },
+    {
+      "forward": [
+        {
+          "number": "",
+          "company": {
+            "id": "2S",
+            "name": "Southwind",
+            "thumb": null,
+            "logo": "https://tourvisor.ru/pics/aircompany/2S.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "14.02.2026",
+            "time": "12:45",
+            "port": {
+              "id": "SVO",
+              "name": "Москва Шереметьево",
+              "shortName": "Шереметьево",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "14.02.2026",
+            "time": "17:00",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "backward": [
+        {
+          "number": "DP860",
+          "company": {
+            "id": "DP",
+            "name": "Победа",
+            "thumb": "https://tourvisor.ru/pics/aircompany/DP.gif",
+            "logo": "https://tourvisor.ru/pics/aircompany/DP.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "21.02.2026",
+            "time": "12:35",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "21.02.2026",
+            "time": "17:25",
+            "port": {
+              "id": "VKO",
+              "name": "Москва, Внуково ",
+              "shortName": "Внуково",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "dateforward": "14.02.2026",
+      "datebackward": "21.02.2026",
+      "price": {
+        "value": 94093,
+        "currency": "RUB"
+      },
+      "fuelcharge": {
+        "value": 0,
+        "currency": "RUB"
+      },
+      "isdefault": false
+    },
+    {
+      "forward": [
+        {
+          "number": "SU2142",
+          "company": {
+            "id": "SU",
+            "name": "Аэрофлот",
+            "thumb": "https://tourvisor.ru/pics/aircompany/SU.gif",
+            "logo": "https://tourvisor.ru/pics/aircompany/SU.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "14.02.2026",
+            "time": "11:30",
+            "port": {
+              "id": "SVO",
+              "name": "Москва Шереметьево",
+              "shortName": "Шереметьево",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "14.02.2026",
+            "time": "16:30",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "backward": [
+        {
+          "number": "DP860",
+          "company": {
+            "id": "DP",
+            "name": "Победа",
+            "thumb": "https://tourvisor.ru/pics/aircompany/DP.gif",
+            "logo": "https://tourvisor.ru/pics/aircompany/DP.svg"
+          },
+          "fuelCharges": null,
+          "plane": "",
+          "class": "Y",
+          "departure": {
+            "date": "21.02.2026",
+            "time": "12:35",
+            "port": {
+              "id": "AYT",
+              "name": "Анталия, Турция",
+              "shortName": "Анталия",
+              "timeZone": "+03:00"
+            }
+          },
+          "arrival": {
+            "date": "21.02.2026",
+            "time": "17:25",
+            "port": {
+              "id": "VKO",
+              "name": "Москва, Внуково ",
+              "shortName": "Внуково",
+              "timeZone": "+03:00"
+            }
+          },
+          "onDemand": false,
+          "noPlaces": false,
+          "baggage": null,
+          "carryOn": ""
+        }
+      ],
+      "dateforward": "14.02.2026",
+      "datebackward": "21.02.2026",
+      "price": {
+        "value": 95401,
+        "currency": "RUB"
+      },
+      "fuelcharge": {
+        "value": 0,
+        "currency": "RUB"
+      },
+      "isdefault": false
+    }
+  ],
+  "tourinfo": {
+    "addpayments": [
+      {
+        "name": "Турция, Мед.страховка (40000 EUR)",
+        "amount": 1495
+      }
+    ],
+    "flags": {
+      "notransfer": true,
+      "nomedinsurance": false,
+      "noflight": false,
+      "nomeal": false
+    }
+  },
+  "iserror": false
+}

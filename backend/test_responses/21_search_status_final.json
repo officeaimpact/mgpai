@@ -1,0 +1,14 @@
+{
+  "data": {
+    "status": {
+      "state": "finished",
+      "progress": 100,
+      "requestid": 11704185359,
+      "hotelsfound": 64,
+      "toursfound": 998,
+      "minprice": 60455,
+      "maxprice": 1569702,
+      "timepassed": 9
+    }
+  }
+}

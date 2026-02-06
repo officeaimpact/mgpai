@@ -1,0 +1,328 @@
+{
+  "lists": {
+    "subregions": {
+      "subregion": [
+        {
+          "id": "184",
+          "name": "Авсаллар",
+          "parentregion": "19"
+        },
+        {
+          "id": "503",
+          "name": "Аксарай",
+          "parentregion": "277"
+        },
+        {
+          "id": "185",
+          "name": "Алания-центр",
+          "parentregion": "19"
+        },
+        {
+          "id": "193",
+          "name": "Анталия-центр",
+          "parentregion": "20"
+        },
+        {
+          "id": "505",
+          "name": "Бакыркёй",
+          "parentregion": "277"
+        },
+        {
+          "id": "504",
+          "name": "Бейазит",
+          "parentregion": "277"
+        },
+        {
+          "id": "213",
+          "name": "Бейоглу",
+          "parentregion": "277"
+        },
+        {
+          "id": "231",
+          "name": "Белек-центр",
+          "parentregion": "21"
+        },
+        {
+          "id": "219",
+          "name": "Бельдиби",
+          "parentregion": "22"
+        },
+        {
+          "id": "206",
+          "name": "Битез",
+          "parentregion": "24"
+        },
+        {
+          "id": "232",
+          "name": "Богазкент",
+          "parentregion": "21"
+        },
+        {
+          "id": "207",
+          "name": "Бодрум-центр",
+          "parentregion": "24"
+        },
+        {
+          "id": "517",
+          "name": "Бурса",
+          "parentregion": "268"
+        },
+        {
+          "id": "220",
+          "name": "Гойнюк",
+          "parentregion": "22"
+        },
+        {
+          "id": "208",
+          "name": "Гюмбет",
+          "parentregion": "24"
+        },
+        {
+          "id": "225",
+          "name": "Дальян",
+          "parentregion": "25"
+        },
+        {
+          "id": "186",
+          "name": "Инжекум",
+          "parentregion": "19"
+        },
+        {
+          "id": "233",
+          "name": "Искеле",
+          "parentregion": "21"
+        },
+        {
+          "id": "227",
+          "name": "Ичмелер",
+          "parentregion": "26"
+        },
+        {
+          "id": "234",
+          "name": "Кадрие",
+          "parentregion": "21"
+        },
+        {
+          "id": "214",
+          "name": "Кадыкей",
+          "parentregion": "277"
+        },
+        {
+          "id": "335",
+          "name": "Кайсери",
+          "parentregion": "586"
+        },
+        {
+          "id": "563",
+          "name": "Каш",
+          "parentregion": "20"
+        },
+        {
+          "id": "221",
+          "name": "Кемер - центр",
+          "parentregion": "22"
+        },
+        {
+          "id": "187",
+          "name": "Кестель",
+          "parentregion": "19"
+        },
+        {
+          "id": "222",
+          "name": "Кириш",
+          "parentregion": "22"
+        },
+        {
+          "id": "188",
+          "name": "Конаклы",
+          "parentregion": "19"
+        },
+        {
+          "id": "194",
+          "name": "Коньяалты",
+          "parentregion": "20"
+        },
+        {
+          "id": "197",
+          "name": "Кумкой",
+          "parentregion": "23"
+        },
+        {
+          "id": "195",
+          "name": "Кунду",
+          "parentregion": "20"
+        },
+        {
+          "id": "198",
+          "name": "Кызылагач",
+          "parentregion": "23"
+        },
+        {
+          "id": "199",
+          "name": "Кызылот",
+          "parentregion": "23"
+        },
+        {
+          "id": "215",
+          "name": "Лалели",
+          "parentregion": "277"
+        },
+        {
+          "id": "196",
+          "name": "Лара",
+          "parentregion": "20"
+        },
+        {
+          "id": "200",
+          "name": "Манавгат",
+          "parentregion": "23"
+        },
+        {
+          "id": "228",
+          "name": "Мармарис-центр",
+          "parentregion": "26"
+        },
+        {
+          "id": "189",
+          "name": "Махмутлар",
+          "parentregion": "19"
+        },
+        {
+          "id": "406",
+          "name": "Невшехир",
+          "parentregion": "599"
+        },
+        {
+          "id": "190",
+          "name": "Обакой",
+          "parentregion": "19"
+        },
+        {
+          "id": "191",
+          "name": "Окурджалар",
+          "parentregion": "19"
+        },
+        {
+          "id": "212",
+          "name": "Олюдениз",
+          "parentregion": "27"
+        },
+        {
+          "id": "226",
+          "name": "Сарыгерме",
+          "parentregion": "25"
+        },
+        {
+          "id": "201",
+          "name": "Сиде-центр",
+          "parentregion": "23"
+        },
+        {
+          "id": "216",
+          "name": "Сиркеджи",
+          "parentregion": "277"
+        },
+        {
+          "id": "229",
+          "name": "Ситилер",
+          "parentregion": "26"
+        },
+        {
+          "id": "202",
+          "name": "Соргун",
+          "parentregion": "23"
+        },
+        {
+          "id": "217",
+          "name": "Султанахмет",
+          "parentregion": "277"
+        },
+        {
+          "id": "218",
+          "name": "Таксим",
+          "parentregion": "277"
+        },
+        {
+          "id": "223",
+          "name": "Текирова",
+          "parentregion": "22"
+        },
+        {
+          "id": "203",
+          "name": "Титренголь",
+          "parentregion": "23"
+        },
+        {
+          "id": "209",
+          "name": "Торба",
+          "parentregion": "24"
+        },
+        {
+          "id": "210",
+          "name": "Тургутреис",
+          "parentregion": "24"
+        },
+        {
+          "id": "230",
+          "name": "Турундж",
+          "parentregion": "26"
+        },
+        {
+          "id": "192",
+          "name": "Тюрклер",
+          "parentregion": "19"
+        },
+        {
+          "id": "518",
+          "name": "Улудаг",
+          "parentregion": "268"
+        },
+        {
+          "id": "407",
+          "name": "Ургуп",
+          "parentregion": "599"
+        },
+        {
+          "id": "506",
+          "name": "Фатих",
+          "parentregion": "277"
+        },
+        {
+          "id": "224",
+          "name": "Чамьюва",
+          "parentregion": "22"
+        },
+        {
+          "id": "204",
+          "name": "Чолаклы",
+          "parentregion": "23"
+        },
+        {
+          "id": "507",
+          "name": "Шишли",
+          "parentregion": "277"
+        },
+        {
+          "id": "205",
+          "name": "Эвренсеки",
+          "parentregion": "23"
+        },
+        {
+          "id": "336",
+          "name": "Эрджиес",
+          "parentregion": "586"
+        },
+        {
+          "id": "519",
+          "name": "Ялова",
+          "parentregion": "277"
+        },
+        {
+          "id": "211",
+          "name": "Ялыкавак",
+          "parentregion": "24"
+        }
+      ]
+    }
+  }
+}

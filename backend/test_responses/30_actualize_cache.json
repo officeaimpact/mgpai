@@ -1,0 +1,42 @@
+{
+  "data": {
+    "tour": {
+      "hotelcode": "58813",
+      "hotelname": "ARSI ENFI CITY BEACH",
+      "hotelstars": "4",
+      "hotelregioncode": "19",
+      "hotelregionname": "Аланья",
+      "countrycode": "4",
+      "countryname": "Турция",
+      "departurecode": "1",
+      "departurename": "Москва",
+      "operatorcode": "169",
+      "operatorname": "Турплатформа",
+      "flydate": "14.02.2026",
+      "nights": "7",
+      "meal": "AI",
+      "mealcode": "7",
+      "room": "economy room",
+      "tourname": "MOW-AYT(Markup-3) ПРОМО 7 Hotel commission Стандарт",
+      "placement": "2 взрослых",
+      "adults": "2",
+      "child": "0",
+      "detailavailable": "1",
+      "price": "60455",
+      "fuelcharge": "0",
+      "currency": "RUB",
+      "operatorprice": "646.993",
+      "operatorcurrency": "EUR",
+      "visacharge": "0",
+      "hotelpicturesmall": "https://static.tourvisor.ru/hotel_pics/small/58813.jpg",
+      "hotelpicturemedium": "https://static.tourvisor.ru/hotel_pics/medium/58813.jpg",
+      "hotelpicturebig": "https://static.tourvisor.ru/hotel_pics/main400/58813.jpg",
+      "hoteldescription": "Отель в Алании, через дорогу от песчано-галечного пляжа. Компактная территория, открытый бассейн с водной горкой. Рядом располагается вся курортная инфраструктура.",
+      "fulldesclink": "https://mgp.ru/tours#!/hotel=arsi-enfi-city-beach",
+      "operatorlink": "https://online.tour-platform.ru/search_tour?STATEINC=9&TOWNFROMINC=2&HOTELS=6049&CHECKIN_BEG=20260214&CHECKIN_END=20260214&NIGHTS_FROM=7&NIGHTS_TILL=7&ADULT=2&CHILD=0&DOLOAD=1",
+      "regular": "1",
+      "promo": "1",
+      "hotelstatus": "2"
+    }
+  }
+}

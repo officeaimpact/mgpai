@@ -1,0 +1,57 @@
+{
+  "data": {
+    "hotel": {
+      "name": "ARSI ENFI CITY BEACH",
+      "stars": "4",
+      "regioncode": "19",
+      "region": "Аланья",
+      "countrycode": "4",
+      "country": "Турция",
+      "rating": "3.3",
+      "seadistance": "70",
+      "build": "2018",
+      "placement": "В 1,5 км от центра г. Алания. Международный аэропорт Анталии находится в 130 км от отеля, международный аэропорт Газипаша — в 45 км.",
+      "square": "2 500 кв м",
+      "phone": "+90 242 513 11 95",
+      "site": "arsihotels.com",
+      "description": "Состоит из трех 4-этажных зданий. Для удобства имеются лифты. Номерной фонд отеля насчитывает 132 номера.",
+      "territory": "открытый бассейн, 170 кв м, горка; основной ресторан: открытая секция на 250 чел и крытая секция на 150 чел; бар у бассейна; ТВ-салон; спа-центр; зал для собраний 80 кв м на 50 чел",
+      "inroom": "индивидуальный кондиционер; ванная комната с душевой кабиной; спутниковое ТВ; прямой телефон; сейф (платно); мини-бар; фен; чайник; банные принадлежности; Wi-Fi (бесплатно)",
+      "roomtypes": "Standard room: 16-18 кв м, вид на сад/бассейн, балкон, макс. размещение 3+1 чел",
+      "services": "хаммам, сауна; салон красоты; Wi-Fi; сейф на ресепшен; услуги прачечной; услуги врача; аренда автомобиля",
+      "servicepay": "водные виды спорта; массаж",
+      "animation": "софт-анимация у бассейна на русском языке; дискотека (платно)",
+      "child": "кроватка (по запросу); детский открытый бассейн; детские стулья в главном ресторане; детская площадка",
+      "beach": "частный песчано-галечный пляж находится в 50 м от отеля, через дорогу, по подземному переходу; шезлонги, зонтики — платно, пляжных полотенец нет; душ, кабины для переодевания, спасатель на пляже; заход в море—  песок",
+      "meallist": "RO — без питания; BB — завтрак; HB — полупансион; AI — всё включено",
+      "mealtypes": "AI:в концепцию входит: завтрак, обед и ужин - шведский стол, поздний завтрак, закуски и выпечка - в определенные часы, местные алкогольные и безалкогольные напитки (10:00 – 23:00); платно: все импортные напитки, коктейли, напитки, не входящие в концепцию и в бутылках, свежевыжатые соки, мороженное, турецкий кофе, все напитки после 23:00",
+      "images": {
+        "image": [
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914100.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914101.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914102.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914103.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914104.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914105.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914106.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914107.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914108.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914110.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914111.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914112.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914114.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914116.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914121.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914129.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914130.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914131.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914132.jpg",
+          "//static.tourvisor.ru/hotel_pics/verybig/4/arsi-enfi-city-beach-2914133.jpg"
+        ]
+      },
+      "imagescount": "20",
+      "coord1": "36.543628",
+      "coord2": "32.01455"
+    }
+  }
+}

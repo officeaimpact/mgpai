@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Турменеджер</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .chat-header .avatar {
+            width: 48px;
+            height: 48px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .chat-header .info h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .chat-header .info p {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+        
+        .chat-header .reset-btn {
+            margin-left: auto;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        .chat-header .reset-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .message {
+            max-width: 85%;
+            padding: 14px 18px;
+            border-radius: 18px;
+            line-height: 1.5;
+            font-size: 15px;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .message.user {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.assistant {
+            background: #f3f4f6;
+            color: #1f2937;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .message.assistant a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .message.assistant a:hover {
+            text-decoration: underline;
+        }
+        
+        .message.typing {
+            background: #f3f4f6;
+            color: #9ca3af;
+        }
+        
+        .message.typing::after {
+            content: '●●●';
+            animation: typing 1.5s infinite;
+        }
+        
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.3; }
+            30% { opacity: 1; }
+        }
+        
+        .chat-input {
+            padding: 20px 24px;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 12px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid #e5e7eb;
+            border-radius: 14px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .chat-input input:focus {
+            border-color: #667eea;
+        }
+        
+        .chat-input button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .chat-input button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .chat-input button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .welcome {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+        
+        .welcome h2 {
+            font-size: 24px;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+        
+        .welcome p {
+            margin-bottom: 20px;
+        }
+        
+        .suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+        
+        .suggestion {
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            padding: 10px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .suggestion:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        /* Markdown styling */
+        .message.assistant strong {
+            font-weight: 600;
+        }
+        
+        .message.assistant ul, .message.assistant ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        
+        .message.assistant li {
+            margin: 4px 0;
+        }
+        
+        .message.assistant h3 {
+            font-size: 16px;
+            margin: 12px 0 8px;
+        }
+        
+        .message.assistant p {
+            margin: 8px 0;
+        }
+        
+        .message.assistant code {
+            background: #e5e7eb;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        
+        /* Стили для картинок отелей */
+        .message.assistant img {
+            max-width: 100%;
+            border-radius: 12px;
+            margin: 10px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .message.assistant h3 {
+            font-size: 16px;
+            margin: 16px 0 8px;
+            color: #1f2937;
+        }
+        
+        /* Разделитель между карточками */
+        .message.assistant hr {
+            border: none;
+            border-top: 1px solid #e5e7eb;
+            margin: 16px 0;
+        }
+        
+        /* Эмодзи в тексте */
+        .message.assistant p {
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="avatar">✈️</div>
+            <div class="info">
+                <h1>AI Турменеджер</h1>
+                <p>YandexGPT Pro • Онлайн</p>
+            </div>
+            <button class="reset-btn" onclick="resetChat()">🔄 Новый чат</button>
+        </div>
+        
+        <div class="chat-messages" id="messages">
+            <div class="welcome">
+                <h2>Привет! 👋</h2>
+                <p>Я AI-менеджер турагентства. Помогу подобрать тур, расскажу про отели и курорты.</p>
+                <div class="suggestions">
+                    <span class="suggestion" onclick="sendSuggestion(this)">Найди тур в Турцию</span>
+                    <span class="suggestion" onclick="sendSuggestion(this)">Горящие туры из Москвы</span>
+                    <span class="suggestion" onclick="sendSuggestion(this)">Погода в Египте</span>
+                    <span class="suggestion" onclick="sendSuggestion(this)">Нужна ли виза в Таиланд?</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-input">
+            <input 
+                type="text" 
+                id="messageInput" 
+                placeholder="Напишите сообщение..." 
+                onkeypress="handleKeyPress(event)"
+            >
+            <button id="sendBtn" onclick="sendMessage()">Отправить</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
+        
+        let isStreaming = false;
+        
+        function addMessage(content, role, isStreaming = false) {
+            // Убираем welcome если это первое сообщение
+            const welcome = document.querySelector('.welcome');
+            if (welcome) welcome.remove();
+            
+            const msg = document.createElement('div');
+            msg.className = `message ${role}`;
+            
+            if (role === 'assistant') {
+                msg.innerHTML = marked.parse(content);
+            } else {
+                msg.textContent = content;
+            }
+            
+            if (isStreaming) {
+                msg.id = 'streaming-message';
+            }
+            
+            messagesContainer.appendChild(msg);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            return msg;
+        }
+        
+        function updateStreamingMessage(content) {
+            let msg = document.getElementById('streaming-message');
+            if (!msg) {
+                msg = addMessage(content, 'assistant', true);
+            } else {
+                msg.innerHTML = marked.parse(content);
+            }
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        function finalizeStreamingMessage() {
+            const msg = document.getElementById('streaming-message');
+            if (msg) {
+                msg.removeAttribute('id');
+            }
+        }
+        
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || isStreaming) return;
+            
+            messageInput.value = '';
+            addMessage(message, 'user');
+            
+            isStreaming = true;
+            sendBtn.disabled = true;
+            
+            let fullContent = '';
+            
+            try {
+                const response = await fetch('/api/chat/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, session_id: sessionId })
+                });
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.type === 'token') {
+                                    fullContent += data.content;
+                                    updateStreamingMessage(fullContent);
+                                } else if (data.type === 'done') {
+                                    // Если не было токенов, используем content из done
+                                    if (!fullContent && data.content) {
+                                        fullContent = data.content;
+                                        updateStreamingMessage(fullContent);
+                                    }
+                                    finalizeStreamingMessage();
+                                } else if (data.type === 'error') {
+                                    addMessage('Ошибка: ' + data.content, 'assistant');
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+            } catch (error) {
+                addMessage('Ошибка соединения: ' + error.message, 'assistant');
+            }
+            
+            finalizeStreamingMessage();
+            isStreaming = false;
+            sendBtn.disabled = false;
+            messageInput.focus();
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+        
+        function sendSuggestion(el) {
+            messageInput.value = el.textContent;
+            sendMessage();
+        }
+        
+        async function resetChat() {
+            try {
+                await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                
+                messagesContainer.innerHTML = `
+                    <div class="welcome">
+                        <h2>Привет! 👋</h2>
+                        <p>Я AI-менеджер турагентства. Помогу подобрать тур, расскажу про отели и курорты.</p>
+                        <div class="suggestions">
+                            <span class="suggestion" onclick="sendSuggestion(this)">Найди тур в Турцию</span>
+                            <span class="suggestion" onclick="sendSuggestion(this)">Горящие туры из Москвы</span>
+                            <span class="suggestion" onclick="sendSuggestion(this)">Погода в Египте</span>
+                            <span class="suggestion" onclick="sendSuggestion(this)">Нужна ли виза в Таиланд?</span>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Reset error:', error);
+            }
+        }
+        
+        // Focus input on load
+        messageInput.focus();
+    </script>
+</body>
+</html>
