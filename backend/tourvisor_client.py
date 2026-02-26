@@ -57,7 +57,7 @@ class TourVisorClient:
         self.auth_login = os.getenv("TOURVISOR_AUTH_LOGIN")
         self.auth_pass = os.getenv("TOURVISOR_AUTH_PASS")
     
-    async def _request(self, endpoint: str, params: Dict[str, Any] = None) -> Dict:
+    async def _request(self, endpoint: str, params: Dict[str, Any] = None, timeout: Optional[float] = None) -> Dict:
         """
         Базовый запрос к API с обработкой ошибок
         
@@ -84,7 +84,8 @@ class TourVisorClient:
         # Создаём новый клиент для каждого запроса (избегаем Event loop is closed)
         # Fix M6+F8: Таймаут для actdetail/actualize — 30с (если оператор не ответил за 30с,
         # ждать дольше бессмысленно; при ReadTimeout сработает retry P14 + fallback F2)
-        _timeout = 30.0 if endpoint in ("actdetail.php", "actualize.php") else 30.0
+        _default_timeout = 30.0 if endpoint in ("actdetail.php", "actualize.php") else 30.0
+        _timeout = timeout if timeout is not None else _default_timeout
         # Fix P14: Ретрай при ReadTimeout для actdetail/actualize
         _max_attempts = 2 if endpoint in ("actdetail.php", "actualize.php") else 1
         for _attempt in range(_max_attempts):
@@ -553,7 +554,8 @@ class TourVisorClient:
     async def get_tour_details(
         self, 
         tour_id: str,
-        currency: int = 0  # 0=RUB, 1=USD/EUR, 2=BYR, 3=KZT
+        currency: int = 0,  # 0=RUB, 1=USD/EUR, 2=BYR, 3=KZT
+        timeout: Optional[float] = None
     ) -> Dict:
         """
         Получить детальную информацию о туре (рейсы, доплаты)
@@ -568,7 +570,7 @@ class TourVisorClient:
             params["currency"] = currency
         
         try:
-            data = await self._request("actdetail.php", params)
+            data = await self._request("actdetail.php", params, timeout=timeout)
         except TourIdExpiredError as e:
             e.args = (
                 "Данные тура устарели. Нужен новый поиск для получения деталей рейсов.",

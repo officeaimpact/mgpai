@@ -26,4 +26,13 @@ backend/.env
 # Logs / runtime
 *.log
 *.pid
+logs/
+
+# Archives / binary
+*.zip
+*.docx
+
+# Test output
+test_*_output.txt
+test_nano_output.txt
 
